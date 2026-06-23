@@ -1,30 +1,31 @@
 #!/bin/bash
 # ╔══════════════════════════════════════════════════════════════╗
-# ║   TyranRoot OS — Termux Customization Tool v1.0             ║
-# ║   Author: TyranRoot | Termux Setup & Beautifier             ║
+# ║   TyranRoot OS — Termux Customization Tool v1.1             ║
+# ║   Fixed for Termux Compatibility                            ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 # ── Colors ────────────────────────────────────────────────────
 R='\033[1;31m'; G='\033[1;32m'; Y='\033[1;33m'
 B='\033[1;34m'; M='\033[1;35m'; C='\033[1;36m'
 W='\033[1;37m'; DIM='\033[2m';  RS='\033[0m'
-BG_R='\033[41m'; BLINK='\033[5m'
 
-# ── Terminal Width ────────────────────────────────────────────
-TW=$(tput cols 2>/dev/null || echo 60)
-BW=$(( TW > 70 ? 68 : TW - 2 ))
+# ── Terminal Width (Fixed for Termux) ──────────────────────
+TW=60  # Fixed width for Termux
+BW=56
 PAD=$(( (TW - BW) / 2 ))
 LP=$(printf '%*s' "$PAD" "")
 
 # ── Config File ───────────────────────────────────────────────
 CONFIG="$HOME/.tyranroot_config"
-[ -f "$CONFIG" ] || cat > "$CONFIG" <<'CONF'
+if [ ! -f "$CONFIG" ]; then
+    cat > "$CONFIG" <<'CONF'
 USERNAME=TyranRoot
 HOSTNAME=TyranRoot
 SHELL_COLOR=cyan
 PROMPT_STYLE=kali
 BANNER_STYLE=1
 CONF
+fi
 
 source "$CONFIG" 2>/dev/null
 
@@ -43,18 +44,18 @@ clr_code() {
 }
 
 cline() {
-    # Draw a box line: ╔═══╗ or ╚═══╝
     printf "${C}${LP}%s" "$1"
     for ((i=0; i<BW-2; i++)); do printf "═"; done
     printf "%s${RS}\n" "$2"
 }
 
 cmid() {
-    # Draw centered text inside box ║ text ║
     local text="$1" color="${2:-$W}"
     local len=${#text}
     local sp=$(( (BW - 2 - len) / 2 ))
     local sp2=$(( BW - 2 - len - sp ))
+    [ $sp -lt 0 ] && sp=0
+    [ $sp2 -lt 0 ] && sp2=0
     printf "${C}${LP}║%*s${color}%s${C}%*s║${RS}\n" "$sp" "" "$text" "$sp2" ""
 }
 
@@ -83,20 +84,16 @@ banner() {
         echo -e "${C}${LP}           ██╔══██╗██║   ██║██║   ██║   ██║   ${RS}"
         echo -e "${G}${LP}           ██║  ██║╚██████╔╝╚██████╔╝   ██║   ${RS}"
         echo -e "${G}${LP}           ╚═╝  ╚═╝ ╚═════╝  ╚═════╝    ╚═╝   ${RS}"
-
     elif [ "$BANNER_STYLE" = "2" ]; then
         echo -e "${C}${LP} _______ _______ ______ _____ ____  "
         echo -e "${C}${LP}|__   __|_   _\ \/ /  _ \_   _/ __ \ "
         echo -e "${G}${LP}   | |    | |  \  /| |_) || || |  | |"
         echo -e "${G}${LP}   | |   _| |_ /  \|  _ < | || |__| |"
         echo -e "${R}${LP}   |_|  |_____/_/\_\_| \_\_____\____/ ${RS}"
-        echo -e "${R}${LP}         TYRAN ROOT OS v1.0${RS}"
-
+        echo -e "${R}${LP}         TYRAN ROOT OS v1.1${RS}"
     elif [ "$BANNER_STYLE" = "3" ]; then
         if command -v figlet &>/dev/null; then
-            figlet -f ASCII-Shadow "TyranRoot" 2>/dev/null | while IFS= read -r line; do
-                echo -e "${C}${LP}$line${RS}"
-            done || figlet "TyranRoot" | while IFS= read -r line; do
+            figlet "TyranRoot" 2>/dev/null | while IFS= read -r line; do
                 echo -e "${C}${LP}$line${RS}"
             done
         else
@@ -106,8 +103,8 @@ banner() {
 
     echo -e ""
     cline "╔" "╗"
-    cmid  "TyranRoot OS — Termux Customization Tool v1.0" "$W"
-    cmid  "Author: TyranRoot | Kali-style Termux Setup" "$DIM"
+    cmid  "TyranRoot OS — Termux Customization v1.1" "$W"
+    cmid  "Fixed for Termux Compatibility" "$DIM"
     cline "╚" "╝"
     echo -e ""
     echo -e "${LP}  ${R}[!]${W} User     : ${C}${USERNAME}${RS}"
@@ -122,7 +119,7 @@ install_base() {
     echo -e "\n${LP}${Y}[▶] Installing base packages...${RS}\n"
     pkg update -y && pkg upgrade -y
     pkg install -y zsh fish git curl wget figlet toilet ruby bat eza lsd neofetch
-    gem install lolcat 2>/dev/null
+    gem install lolcat 2>/dev/null || echo -e "${LP}${Y}[!] lolcat install skipped${RS}"
     echo -e "\n${LP}${G}[✔] Base packages installed.${RS}"
     press_enter; menu
 }
@@ -132,49 +129,49 @@ apply_zsh_prompt() {
     local style="$1"
     local user="$USERNAME"
     local host="$HOSTNAME"
-    local clr
-    clr=$(clr_code "$SHELL_COLOR")
 
-    local prompt_code=""
+    # Remove old TyranRoot prompt
+    sed -i '/# TyranRoot.*prompt/,/^$/d' ~/.zshrc 2>/dev/null
 
-    if [ "$style" = "kali" ]; then
-        prompt_code="
+    case "$style" in
+        kali)
+            cat >> ~/.zshrc <<'ZSH'
 # TyranRoot Kali-style prompt
 autoload -Uz vcs_info
 precmd() { vcs_info }
 zstyle ':vcs_info:git:*' formats '(%b)'
 setopt PROMPT_SUBST
-PROMPT='%F{red}┌──(%F{cyan}${user}㉿${host}%F{red})-[%F{white}%~%F{red}]%f\$(vcs_info_msg_0_)
-%F{red}└─%F{white}\$ %f'
-"
-    elif [ "$style" = "arrow" ]; then
-        prompt_code="
+PROMPT='%F{red}┌──(%F{cyan}'${user}'㉿'${host}'%F{red})-[%F{white}%~%F{red}]%f$(vcs_info_msg_0_)
+%F{red}└─%F{white}$ %f'
+ZSH
+            ;;
+        arrow)
+            cat >> ~/.zshrc <<ZSH
 # TyranRoot Arrow prompt
-PROMPT='%F{cyan}╔═[%F{white}${user}@${host}%F{cyan}]═[%F{green}%~%F{cyan}]
+PROMPT='%F{cyan}╔═[%F{white}'${user}'@'${host}'%F{cyan}]═[%F{green}%~%F{cyan}]
 %F{cyan}╚═▶ %F{white}%f'
-"
-    elif [ "$style" = "minimal" ]; then
-        prompt_code="
+ZSH
+            ;;
+        minimal)
+            cat >> ~/.zshrc <<ZSH
 # TyranRoot Minimal prompt
-PROMPT='%F{cyan}${user}%F{white}@%F{red}${host} %F{green}%~ %F{yellow}❯ %f'
-"
-    elif [ "$style" = "powerline" ]; then
-        prompt_code="
-# TyranRoot Powerline-style prompt
-PROMPT='%K{blue}%F{white} ${user} %k%K{cyan}%F{blue}%F{black} ${host} %k%K{green}%F{cyan}%F{black} %~ %k%F{green} %f'
-"
-    elif [ "$style" = "hacker" ]; then
-        prompt_code="
+PROMPT='%F{cyan}'${user}'%F{white}@%F{red}'${host}' %F{green}%~ %F{yellow}❯ %f'
+ZSH
+            ;;
+        hacker)
+            cat >> ~/.zshrc <<ZSH
 # TyranRoot Hacker prompt
-PROMPT='%F{green}[%F{white}root@${host}%F{green}]-[%F{red}%~%F{green}]
+PROMPT='%F{green}[%F{white}root@'${host}'%F{green}]-[%F{red}%~%F{green}]
 %F{green}# %f'
-"
-    fi
-
-    # Write to .zshrc
-    # Remove old TyranRoot prompt block if exists
-    sed -i '/# TyranRoot.*prompt/,/^$/d' ~/.zshrc 2>/dev/null
-    echo "$prompt_code" >> ~/.zshrc
+ZSH
+            ;;
+        powerline)
+            cat >> ~/.zshrc <<ZSH
+# TyranRoot Powerline prompt
+PROMPT='%K{blue}%F{white} '${user}' %k%K{cyan}%F{blue}%F{black} '${host}' %k%K{green}%F{cyan}%F{black} %~ %k%F{green} %f'
+ZSH
+            ;;
+    esac
     echo -e "${LP}${G}[✔] Zsh prompt applied: ${style}${RS}"
 }
 
@@ -185,8 +182,9 @@ apply_fish_prompt() {
     local host="$HOSTNAME"
     mkdir -p ~/.config/fish/functions
 
-    if [ "$style" = "kali" ]; then
-        cat > ~/.config/fish/functions/fish_prompt.fish <<FISH
+    case "$style" in
+        kali)
+            cat > ~/.config/fish/functions/fish_prompt.fish <<FISH
 function fish_prompt
     set_color red
     echo -n "┌──("
@@ -206,8 +204,9 @@ function fish_prompt
     set_color normal
 end
 FISH
-    elif [ "$style" = "arrow" ]; then
-        cat > ~/.config/fish/functions/fish_prompt.fish <<FISH
+            ;;
+        arrow)
+            cat > ~/.config/fish/functions/fish_prompt.fish <<FISH
 function fish_prompt
     set_color cyan
     echo -n "╔═["
@@ -225,8 +224,9 @@ function fish_prompt
     set_color normal
 end
 FISH
-    elif [ "$style" = "hacker" ]; then
-        cat > ~/.config/fish/functions/fish_prompt.fish <<FISH
+            ;;
+        hacker)
+            cat > ~/.config/fish/functions/fish_prompt.fish <<FISH
 function fish_prompt
     set_color green
     echo -n "[root@${host}]-["
@@ -239,7 +239,25 @@ function fish_prompt
     set_color normal
 end
 FISH
-    fi
+            ;;
+        minimal)
+            cat > ~/.config/fish/functions/fish_prompt.fish <<FISH
+function fish_prompt
+    set_color cyan
+    echo -n "${user}"
+    set_color white
+    echo -n "@"
+    set_color red
+    echo -n "${host}"
+    set_color green
+    echo -n " "(prompt_pwd)
+    set_color yellow
+    echo -n " ❯ "
+    set_color normal
+end
+FISH
+            ;;
+    esac
     echo -e "${LP}${G}[✔] Fish prompt applied: ${style}${RS}"
 }
 
@@ -252,26 +270,53 @@ apply_bash_prompt() {
     # Remove old
     sed -i '/# TyranRoot prompt/,/^$/d' ~/.bashrc 2>/dev/null
 
-    if [ "$style" = "kali" ]; then
-        cat >> ~/.bashrc <<BASH
-
+    case "$style" in
+        kali)
+            cat >> ~/.bashrc <<BASH
 # TyranRoot prompt
 PS1='\[\033[1;31m\]┌──(\[\033[1;36m\]${user}㉿${host}\[\033[1;31m\])-[\[\033[1;37m\]\w\[\033[1;31m\]]\n└─\[\033[1;37m\]\$ \[\033[0m\]'
 BASH
-    elif [ "$style" = "hacker" ]; then
-        cat >> ~/.bashrc <<BASH
-
+            ;;
+        hacker)
+            cat >> ~/.bashrc <<BASH
 # TyranRoot prompt
 PS1='\[\033[1;32m\][root@${host}]-[\[\033[1;31m\]\w\[\033[1;32m\]]\n# \[\033[0m\]'
 BASH
-    elif [ "$style" = "arrow" ]; then
-        cat >> ~/.bashrc <<BASH
-
+            ;;
+        arrow)
+            cat >> ~/.bashrc <<BASH
 # TyranRoot prompt
 PS1='\[\033[1;36m\]╔═[\[\033[1;37m\]${user}@${host}\[\033[1;36m\]]═[\[\033[1;32m\]\w\[\033[1;36m\]]\n╚═▶ \[\033[0m\]'
 BASH
-    fi
+            ;;
+        minimal)
+            cat >> ~/.bashrc <<BASH
+# TyranRoot prompt
+PS1='\[\033[1;36m\]${user}\[\033[1;37m\]@\[\033[1;31m\]${host} \[\033[1;32m\]\w \[\033[1;33m\]❯ \[\033[0m\]'
+BASH
+            ;;
+    esac
     echo -e "${LP}${G}[✔] Bash prompt applied: ${style}${RS}"
+}
+
+# ── CHANGE SHELL (Termux compatible) ────────────────────────
+change_shell() {
+    local shell="$1"
+    local shell_path
+    case "$shell" in
+        zsh)  shell_path="$(which zsh 2>/dev/null || echo "/data/data/com.termux/files/usr/bin/zsh")" ;;
+        fish) shell_path="$(which fish 2>/dev/null || echo "/data/data/com.termux/files/usr/bin/fish")" ;;
+        bash) shell_path="$(which bash 2>/dev/null || echo "/data/data/com.termux/files/usr/bin/bash")" ;;
+    esac
+    
+    if [ -f "$shell_path" ]; then
+        # Termux uses ~/.termux/shell
+        echo "$shell_path" > ~/.termux/shell
+        termux-reload-settings 2>/dev/null
+        echo -e "${LP}${G}[✔] Shell set to $shell. Restart Termux to apply.${RS}"
+    else
+        echo -e "${LP}${R}[✘] $shell not installed. Install first.${RS}"
+    fi
 }
 
 # ── INSTALL ZSH PLUGINS ──────────────────────────────────────
@@ -279,7 +324,11 @@ install_zsh_plugins() {
     echo -e "\n${LP}${Y}[▶] Installing Zsh plugins...${RS}\n"
 
     # Oh-My-Zsh
-    [ -d ~/.oh-my-zsh ] || git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
+    if [ ! -d ~/.oh-my-zsh ]; then
+        git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
+        cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
+    fi
+    
     ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
     # Syntax highlighting
@@ -290,19 +339,12 @@ install_zsh_plugins() {
     local AS="$ZSH_CUSTOM/plugins/zsh-autosuggestions"
     [ -d "$AS" ] || git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions.git "$AS"
 
-    # Autocomplete
-    local AC="$ZSH_CUSTOM/plugins/zsh-autocomplete"
-    [ -d "$AC" ] || git clone --depth=1 https://github.com/marlonrichert/zsh-autocomplete.git "$AC"
-
-    # Update .zshrc plugins line
+    # Update .zshrc
     if [ -f ~/.zshrc ]; then
-        sed -i 's/^plugins=.*/plugins=(git zsh-syntax-highlighting zsh-autosuggestions zsh-autocomplete)/' ~/.zshrc
-    else
-        cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
-        sed -i 's/^plugins=.*/plugins=(git zsh-syntax-highlighting zsh-autosuggestions zsh-autocomplete)/' ~/.zshrc
+        sed -i 's/^plugins=.*/plugins=(git zsh-syntax-highlighting zsh-autosuggestions)/' ~/.zshrc
     fi
 
-    echo -e "${LP}${G}[✔] Plugins installed: syntax-highlighting, autosuggestions, autocomplete${RS}"
+    echo -e "${LP}${G}[✔] Plugins installed: syntax-highlighting, autosuggestions${RS}"
     press_enter; zsh_menu
 }
 
@@ -311,13 +353,10 @@ install_fish_plugins() {
     echo -e "\n${LP}${Y}[▶] Installing Fish plugins...${RS}\n"
     pkg install fish -y
 
-    # Fisher plugin manager
     fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher" 2>/dev/null
+    fish -c "fisher install jorgebucaran/autopair.fish" 2>/dev/null
 
-    # Useful fish plugins
-    fish -c "fisher install PatrickF1/fzf.fish 2>/dev/null; fisher install jorgebucaran/autopair.fish 2>/dev/null; fisher install meaningful-ooo/sponge 2>/dev/null" 2>/dev/null
-
-    echo -e "${LP}${G}[✔] Fish plugins installed (fisher, autopair, fzf)${RS}"
+    echo -e "${LP}${G}[✔] Fish plugins installed${RS}"
     press_enter; fish_menu
 }
 
@@ -446,7 +485,6 @@ change_identity() {
     [ -n "$new_user" ] && USERNAME="$new_user"
     [ -n "$new_host" ] && HOSTNAME="$new_host"
 
-    # Save to config
     cat > "$CONFIG" <<CONF
 USERNAME=$USERNAME
 HOSTNAME=$HOSTNAME
@@ -456,7 +494,6 @@ BANNER_STYLE=$BANNER_STYLE
 CONF
 
     echo -e "${LP}${G}[✔] Identity updated: ${USERNAME}㉿${HOSTNAME}${RS}"
-    echo -e "${LP}${Y}[!] Run 'Apply Prompt' again to update prompt with new name.${RS}"
     press_enter; identity_menu
 }
 
@@ -466,7 +503,7 @@ do_add_lock() {
     echo -ne "${LP}${Y}Create Access Key: ${RS}"
     read -rs new_pass; echo
 
-    read -r -d '' lock_bash <<LOCKBASH
+    local lock_bash=$(cat <<LOCKBASH
 #TYRANLOCK_START
 clear
 echo -e '\033[1;32m  Initializing...\033[0m'
@@ -488,8 +525,8 @@ while [ \$_tl_attempt -le 3 ]; do
 done
 #TYRANLOCK_END
 LOCKBASH
+)
 
-    # Add to top of files
     for rcfile in ~/.bashrc ~/.zshrc; do
         [ -f "$rcfile" ] || continue
         sed -i '/#TYRANLOCK_START/,/#TYRANLOCK_END/d' "$rcfile"
@@ -518,17 +555,15 @@ setup_motd() {
     if [ "$choice" = "neofetch" ]; then
         pkg install neofetch -y 2>/dev/null
         grep -q "neofetch" ~/.bashrc 2>/dev/null || echo -e "\n# TyranRoot MOTD\nneofetch" >> ~/.bashrc
-        grep -q "neofetch" ~/.zshrc  2>/dev/null || echo -e "\n# TyranRoot MOTD\nneofetch" >> ~/.zshrc
+        grep -q "neofetch" ~/.zshrc 2>/dev/null || echo -e "\n# TyranRoot MOTD\nneofetch" >> ~/.zshrc
         echo -e "${LP}${G}[✔] Neofetch set as startup banner.${RS}"
-
     elif [ "$choice" = "custom" ]; then
-        local banner_cmd='echo -e "\033[1;36m"; figlet -f ASCII-Shadow "TyranRoot" 2>/dev/null || figlet "TyranRoot"; echo -e "\033[1;32m  Termux OS v1.0 | Author: TyranRoot\033[0m\n"'
+        local banner_cmd='echo -e "\033[1;36m"; figlet "TyranRoot" 2>/dev/null; echo -e "\033[1;32m  Termux OS v1.1 | TyranRoot\033[0m\n"'
         for rcfile in ~/.bashrc ~/.zshrc; do
             [ -f "$rcfile" ] || continue
             grep -q "TyranRoot MOTD" "$rcfile" || echo -e "\n# TyranRoot MOTD\n$banner_cmd" >> "$rcfile"
         done
         echo -e "${LP}${G}[✔] Custom ASCII banner set as startup.${RS}"
-
     elif [ "$choice" = "remove" ]; then
         for rcfile in ~/.bashrc ~/.zshrc; do
             [ -f "$rcfile" ] && sed -i '/# TyranRoot MOTD/,+1d' "$rcfile"
@@ -578,7 +613,7 @@ zsh_menu() {
     echo -e ""
     echo -e "${LP}  ${C}[${W}01${C}]${G} Install Oh-My-Zsh"
     echo -e "${LP}  ${C}[${W}02${C}]${G} Switch to Zsh"
-    echo -e "${LP}  ${C}[${W}03${C}]${Y} Install Plugins (Highlight + AutoSuggest + Autocomplete)"
+    echo -e "${LP}  ${C}[${W}03${C}]${Y} Install Plugins"
     echo -e "${LP}  ${C}[${W}04${C}]${Y} Apply Prompt Style"
     echo -e "${LP}  ${C}[${W}00${C}]${R} ← Back"
     echo -e ""
@@ -587,10 +622,9 @@ zsh_menu() {
     case $a in
         1|01) echo -e "\n${LP}${Y}Installing Oh-My-Zsh...${RS}"
               [ -d ~/.oh-my-zsh ] || git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
-              cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
+              [ -f ~/.zshrc ] || cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
               echo -e "${LP}${G}[✔] Done.${RS}"; press_enter; zsh_menu ;;
-        2|02) pkg install zsh -y; chsh -s zsh
-              echo -e "${LP}${G}[✔] Switched to Zsh.${RS}"; press_enter; zsh_menu ;;
+        2|02) change_shell "zsh"; press_enter; zsh_menu ;;
         3|03) install_zsh_plugins ;;
         4|04) prompt_style_menu "zsh" ;;
         0|00) menu ;;
@@ -613,7 +647,7 @@ fish_menu() {
     read -r a
     case $a in
         1|01) pkg install fish -y; echo -e "${LP}${G}[✔] Fish installed.${RS}"; press_enter; fish_menu ;;
-        2|02) pkg install fish -y; chsh -s fish; echo -e "${LP}${G}[✔] Switched to Fish.${RS}"; press_enter; fish_menu ;;
+        2|02) change_shell "fish"; press_enter; fish_menu ;;
         3|03) install_fish_plugins ;;
         4|04) prompt_style_menu "fish" ;;
         0|00) menu ;;
@@ -633,7 +667,7 @@ bash_menu() {
     echo -ne "${LP}${C}Selection ❯ ${RS}"
     read -r a
     case $a in
-        1|01) chsh -s bash; echo -e "${LP}${G}[✔] Switched to Bash.${RS}"; press_enter; bash_menu ;;
+        1|01) change_shell "bash"; press_enter; bash_menu ;;
         2|02) prompt_style_menu "bash" ;;
         0|00) menu ;;
         *)    bash_menu ;;
@@ -647,18 +681,18 @@ prompt_style_menu() {
     cline "╔" "╗"; cmid "PROMPT STYLE — ${shell^^}" "$C"; cline "╚" "╝"
     echo -e ""
     echo -e "${LP}  ${C}[${W}01${C}]${G} Kali Linux Style"
-    echo -e "${LP}  ${DIM}${LP}       ┌──(${USERNAME}㉿${HOSTNAME})-[~]"
+    echo -e "${LP}  ${DIM}       ┌──(${USERNAME}㉿${HOSTNAME})-[~]"
     echo -e "${LP}       └─\$${RS}"
     echo -e ""
     echo -e "${LP}  ${C}[${W}02${C}]${G} Arrow Style"
-    echo -e "${LP}  ${DIM}${LP}       ╔═[${USERNAME}@${HOSTNAME}]═[~]"
+    echo -e "${LP}  ${DIM}       ╔═[${USERNAME}@${HOSTNAME}]═[~]"
     echo -e "${LP}       ╚═▶ ${RS}"
     echo -e ""
     echo -e "${LP}  ${C}[${W}03${C}]${G} Minimal Style"
-    echo -e "${LP}  ${DIM}${LP}       ${USERNAME}@${HOSTNAME} ~ ❯ ${RS}"
+    echo -e "${LP}  ${DIM}       ${USERNAME}@${HOSTNAME} ~ ❯ ${RS}"
     echo -e ""
     echo -e "${LP}  ${C}[${W}04${C}]${G} Hacker Style"
-    echo -e "${LP}  ${DIM}${LP}       [root@${HOSTNAME}]-[~]"
+    echo -e "${LP}  ${DIM}       [root@${HOSTNAME}]-[~]"
     echo -e "${LP}       # ${RS}"
     echo -e ""
     [ "$shell" = "zsh" ] && echo -e "${LP}  ${C}[${W}05${C}]${G} Powerline Style"
@@ -673,12 +707,11 @@ prompt_style_menu() {
         2|02) PROMPT_STYLE="arrow";     apply_${shell}_prompt "arrow"     ;;
         3|03) PROMPT_STYLE="minimal";   apply_${shell}_prompt "minimal"   ;;
         4|04) PROMPT_STYLE="hacker";    apply_${shell}_prompt "hacker"    ;;
-        5|05) [ "$shell"="zsh" ] && { PROMPT_STYLE="powerline"; apply_zsh_prompt "powerline"; } ;;
+        5|05) [ "$shell" = "zsh" ] && { PROMPT_STYLE="powerline"; apply_zsh_prompt "powerline"; } ;;
         0|00) eval "${shell}_menu"; return ;;
         *)    prompt_style_menu "$shell"; return ;;
     esac
 
-    # Save prompt style
     sed -i "s/^PROMPT_STYLE=.*/PROMPT_STYLE=$PROMPT_STYLE/" "$CONFIG"
     echo -e "${LP}${Y}[!] Restart shell or run: source ~/.${shell}rc${RS}"
     press_enter
@@ -698,17 +731,17 @@ appearance_menu() {
     echo -e "${LP}  ${C}[${W}06${C}]${W} Startup Banner: Neofetch"
     echo -e "${LP}  ${C}[${W}07${C}]${W} Startup Banner: Custom ASCII"
     echo -e "${LP}  ${C}[${W}08${C}]${R} Remove Startup Banner"
-    echo -e "${LP}  ${C}[${W}09${C}]${Y} Change Banner Style (ASCII Art)"
+    echo -e "${LP}  ${C}[${W}09${C}]${Y} Change Banner Style"
     echo -e "${LP}  ${C}[${W}00${C}]${R} ← Back"
     echo -e ""
     echo -ne "${LP}${C}Selection ❯ ${RS}"
     read -r a
     case $a in
         1|01) install_font ;;
-        2|02) apply_color_theme "hacker";  echo -e "${LP}${G}[✔] Hacker Green applied.${RS}"; press_enter; appearance_menu ;;
-        3|03) apply_color_theme "kali";    echo -e "${LP}${G}[✔] Kali Dark applied.${RS}";    press_enter; appearance_menu ;;
-        4|04) apply_color_theme "dracula"; echo -e "${LP}${G}[✔] Dracula applied.${RS}";      press_enter; appearance_menu ;;
-        5|05) apply_color_theme "matrix";  echo -e "${LP}${G}[✔] Matrix applied.${RS}";       press_enter; appearance_menu ;;
+        2|02) apply_color_theme "hacker";  press_enter; appearance_menu ;;
+        3|03) apply_color_theme "kali";    press_enter; appearance_menu ;;
+        4|04) apply_color_theme "dracula"; press_enter; appearance_menu ;;
+        5|05) apply_color_theme "matrix";  press_enter; appearance_menu ;;
         6|06) setup_motd "neofetch" ;;
         7|07) setup_motd "custom"   ;;
         8|08) setup_motd "remove"   ;;
@@ -725,7 +758,7 @@ banner_style_menu() {
     echo -e ""
     echo -e "${LP}  ${C}[${W}01${C}]${G} Style 1 — Block Unicode"
     echo -e "${LP}  ${C}[${W}02${C}]${G} Style 2 — Compact ASCII"
-    echo -e "${LP}  ${C}[${W}03${C}]${G} Style 3 — Figlet (requires figlet)"
+    echo -e "${LP}  ${C}[${W}03${C}]${G} Style 3 — Figlet"
     echo -e "${LP}  ${C}[${W}00${C}]${R} ← Back"
     echo -e ""
     echo -ne "${LP}${C}Selection ❯ ${RS}"
