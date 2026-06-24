@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/data/data/com.termux/files/usr/bin/bash
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   TyranRoot OS — Termux Customization Tool v2.0             ║
 # ║   Fully Fixed & Optimized for Termux                        ║
