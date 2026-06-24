@@ -68,38 +68,32 @@ banner() {
     echo -e ""
 
     if [ "$BANNER_STYLE" = "1" ]; then
-        echo -e "${C}${LP}  ████████╗██╗   ██╗██████╗  █████╗ ███╗   ██╗${RS}"
-        echo -e "${C}${LP}     ██╔══╝╚██╗ ██╔╝██╔══██╗██╔══██╗████╗  ██║${RS}"
-        echo -e "${G}${LP}     ██║    ╚████╔╝ ██████╔╝███████║██╔██╗ ██║${RS}"
-        echo -e "${G}${LP}     ██║     ╚██╔╝  ██╔══██╗██╔══██║██║╚██╗██║${RS}"
-        echo -e "${R}${LP}     ██║      ██║   ██║  ██║██║  ██║██║ ╚████║${RS}"
-        echo -e "${R}${LP}     ╚═╝      ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝${RS}"
-        echo -e "${DIM}${LP}           ██████╗  ██████╗  ██████╗ ████████╗${RS}"
-        echo -e "${DIM}${LP}           ██╔══██╗██╔═══██╗██╔═══██╗╚══██╔══╝${RS}"
-        echo -e "${C}${LP}           ██████╔╝██║   ██║██║   ██║   ██║   ${RS}"
-        echo -e "${C}${LP}           ██╔══██╗██║   ██║██║   ██║   ██║   ${RS}"
-        echo -e "${G}${LP}           ██║  ██║╚██████╔╝╚██████╔╝   ██║   ${RS}"
-        echo -e "${G}${LP}           ╚═╝  ╚═╝ ╚═════╝  ╚═════╝    ╚═╝   ${RS}"
+        echo -e "${C}${LP}  ████████╗███████╗██████╗      ██████╗██╗  ██╗ █████╗ ███╗   ██╗${RS}"
+        echo -e "${C}${LP}     ██╔══╝██╔════╝██╔══██╗    ██╔════╝██║  ██║██╔══██╗████╗  ██║${RS}"
+        echo -e "${G}${LP}     ██║   █████╗  ██████╔╝    ██║     ███████║███████║██╔██╗ ██║${RS}"
+        echo -e "${G}${LP}     ██║   ██╔══╝  ██╔══██╗    ██║     ██╔══██║██╔══██║██║╚██╗██║${RS}"
+        echo -e "${R}${LP}     ██║   ███████╗██║  ██║    ╚██████╗██║  ██║██║  ██║██║ ╚████║${RS}"
+        echo -e "${R}${LP}     ╚═╝   ╚══════╝╚═╝  ╚═╝     ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝${RS}"
     elif [ "$BANNER_STYLE" = "2" ]; then
-        echo -e "${C}${LP} _______ _______ ______ _____ ____  "
-        echo -e "${C}${LP}|__   __|_   _\ \/ /  _ \_   _/ __ \ "
-        echo -e "${G}${LP}   | |    | |  \  /| |_) || || |  | |"
-        echo -e "${G}${LP}   | |   _| |_ /  \|  _ < | || |__| |"
-        echo -e "${R}${LP}   |_|  |_____/_/\_\_| \_\_____\____/ ${RS}"
-        echo -e "${R}${LP}         TYRAN ROOT OS v2.0${RS}"
+        echo -e "${C}${LP} _______ _____ ____      ____ _   _    _    _   _ "
+        echo -e "${C}${LP}|__   __|  ___|  _ \    / ___| | | |  / \  | \ | |"
+        echo -e "${G}${LP}   | |  | |_  | |_) |  | |   | |_| | / _ \ |  \| |"
+        echo -e "${G}${LP}   | |  |  _| |  _ <   | |___|  _  |/ ___ \| |\  |"
+        echo -e "${R}${LP}   |_|  |___| |_| \_\   \____|_| |_/_/   \_\_| \_|${RS}"
+        echo -e "${R}${LP}         TER-CHAN OS v2.0${RS}"
     elif [ "$BANNER_STYLE" = "3" ]; then
         if command -v figlet &>/dev/null; then
-            figlet "TyranRoot" 2>/dev/null | while IFS= read -r line; do
+            figlet "Ter-Chan" 2>/dev/null | while IFS= read -r line; do
                 echo -e "${C}${LP}$line${RS}"
             done
         else
-            echo -e "${C}${LP}  TyranRoot OS${RS}"
+            echo -e "${C}${LP}  Ter-Chan OS${RS}"
         fi
     fi
 
     echo -e ""
     cline "╔" "╗"
-    cmid  "TyranRoot OS — Termux Customization v2.0" "$W"
+    cmid  "Ter-Chan OS — Termux Customization v2.0" "$W"
     cmid  "Fully Optimized for Termux" "$DIM"
     cline "╚" "╝"
     echo -e ""
@@ -127,7 +121,6 @@ apply_zsh_prompt() {
     local user="${USERNAME:-TyranRoot}"
     local host="${HOSTNAME:-Termux}"
 
-    # Remove old TyranRoot prompt
     sed -i '/# TyranRoot.*prompt/,/^$/d' ~/.zshrc 2>/dev/null
 
     case "$style" in
@@ -264,7 +257,6 @@ apply_bash_prompt() {
     local user="${USERNAME:-TyranRoot}"
     local host="${HOSTNAME:-Termux}"
 
-    # Remove old
     sed -i '/# TyranRoot prompt/,/^$/d' ~/.bashrc 2>/dev/null
 
     case "$style" in
@@ -300,13 +292,13 @@ BASH
 change_shell() {
     local shell="$1"
     local shell_path
-    
+
     case "$shell" in
         zsh)  shell_path="$(command -v zsh 2>/dev/null || echo "/data/data/com.termux/files/usr/bin/zsh")" ;;
         fish) shell_path="$(command -v fish 2>/dev/null || echo "/data/data/com.termux/files/usr/bin/fish")" ;;
         bash) shell_path="$(command -v bash 2>/dev/null || echo "/data/data/com.termux/files/usr/bin/bash")" ;;
     esac
-    
+
     if [ -f "$shell_path" ]; then
         mkdir -p ~/.termux
         echo "$shell_path" > ~/.termux/shell
@@ -321,27 +313,23 @@ change_shell() {
 install_zsh_plugins() {
     echo -e "\n${LP}${Y}[▶] Installing Zsh plugins...${RS}\n"
 
-    # Oh-My-Zsh
     if [ ! -d ~/.oh-my-zsh ]; then
         git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
         [ -f ~/.zshrc ] || cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
     fi
-    
+
     ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
-    # Syntax highlighting
     local HL="$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
     if [ ! -d "$HL" ]; then
         git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git "$HL"
     fi
 
-    # Autosuggestions
     local AS="$ZSH_CUSTOM/plugins/zsh-autosuggestions"
     if [ ! -d "$AS" ]; then
         git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions.git "$AS"
     fi
 
-    # Update .zshrc
     if [ -f ~/.zshrc ]; then
         sed -i 's/^plugins=.*/plugins=(git zsh-syntax-highlighting zsh-autosuggestions)/' ~/.zshrc
     fi
@@ -369,7 +357,7 @@ install_font() {
 apply_color_theme() {
     local theme="$1"
     mkdir -p ~/.termux
-    
+
     case "$theme" in
         hacker)
             cat > ~/.termux/colors.properties <<'EOF'
@@ -464,7 +452,7 @@ color15=#66ff66
 EOF
             ;;
     esac
-    
+
     termux-reload-settings 2>/dev/null
     echo -e "${LP}${G}[✔] Theme applied: ${theme}${RS}"
 }
@@ -560,7 +548,7 @@ setup_motd() {
             echo -e "${LP}${G}[✔] Neofetch set as startup banner.${RS}"
             ;;
         custom)
-            local banner_cmd='echo -e "\033[1;36m"; figlet "TyranRoot" 2>/dev/null; echo -e "\033[1;32m  Termux OS v2.0 | TyranRoot\033[0m\n"'
+            local banner_cmd='echo -e "\033[1;36m"; figlet "Ter-Chan" 2>/dev/null; echo -e "\033[1;32m  Termux OS v2.0 | Ter-Chan\033[0m\n"'
             for rcfile in ~/.bashrc ~/.zshrc; do
                 [ -f "$rcfile" ] || continue
                 grep -q "TyranRoot MOTD" "$rcfile" || echo -e "\n# TyranRoot MOTD\n$banner_cmd" >> "$rcfile"
@@ -598,7 +586,7 @@ menu() {
     echo -e ""
     echo -ne "${LP}${C}Selection ❯ ${RS}"
     read -r a
-    
+
     case $a in
         1|01) install_base ;;
         2|02) zsh_menu ;;
@@ -607,7 +595,7 @@ menu() {
         5|05) appearance_menu ;;
         6|06) identity_menu ;;
         7|07) security_menu ;;
-        0|00) 
+        0|00)
             echo -e "\n${LP}${C}Goodbye, ${USERNAME:-TyranRoot}. Stay hacking. 🔐${RS}\n"
             exit 0
             ;;
@@ -630,7 +618,7 @@ zsh_menu() {
     echo -e ""
     echo -ne "${LP}${C}Selection ❯ ${RS}"
     read -r a
-    
+
     case $a in
         1|01)
             echo -e "\n${LP}${Y}Installing Oh-My-Zsh...${RS}"
@@ -666,7 +654,7 @@ fish_menu() {
     echo -e ""
     echo -ne "${LP}${C}Selection ❯ ${RS}"
     read -r a
-    
+
     case $a in
         1|01)
             pkg install fish -y
@@ -698,7 +686,7 @@ bash_menu() {
     echo -e ""
     echo -ne "${LP}${C}Selection ❯ ${RS}"
     read -r a
-    
+
     case $a in
         1|01)
             change_shell "bash"
@@ -742,7 +730,7 @@ prompt_style_menu() {
     read -r a
 
     case $a in
-        1|01) 
+        1|01)
             PROMPT_STYLE="kali"
             apply_${shell}_prompt "kali"
             ;;
@@ -800,7 +788,7 @@ appearance_menu() {
     echo -e ""
     echo -ne "${LP}${C}Selection ❯ ${RS}"
     read -r a
-    
+
     case $a in
         1|01) install_font ;;
         2|02)
@@ -846,7 +834,7 @@ banner_style_menu() {
     echo -e ""
     echo -ne "${LP}${C}Selection ❯ ${RS}"
     read -r a
-    
+
     case $a in
         1|01)
             BANNER_STYLE=1
@@ -882,7 +870,7 @@ identity_menu() {
     echo -e ""
     echo -ne "${LP}${C}Selection ❯ ${RS}"
     read -r a
-    
+
     case $a in
         1|01) change_identity ;;
         0|00) menu ;;
@@ -903,7 +891,7 @@ security_menu() {
     echo -e ""
     echo -ne "${LP}${C}Selection ❯ ${RS}"
     read -r a
-    
+
     case $a in
         1|01) do_add_lock ;;
         2|02) do_remove_lock ;;
