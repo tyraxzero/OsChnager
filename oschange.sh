@@ -1,53 +1,41 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════╗
-# ║   Ter-Chan OS — Termux Customization Tool v2.0              ║
-# ║   Python Edition — No CRLF, No Shebang Issues              ║
+# ║   Ter-Chan — Termux Customization Tool v3.0                 ║
+# ║   Python Edition | Zsh Focused                              ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-import os
-import sys
-import subprocess
-import getpass
+import os, sys, subprocess, getpass, shutil
 
 # ── Colors ────────────────────────────────────────────────────
-R  = '\033[1;31m'
-G  = '\033[1;32m'
-Y  = '\033[1;33m'
-B  = '\033[1;34m'
-M  = '\033[1;35m'
-C  = '\033[1;36m'
-W  = '\033[1;37m'
-DIM= '\033[2m'
-RS = '\033[0m'
+R  = '\033[1;31m'; G  = '\033[1;32m'; Y  = '\033[1;33m'
+B  = '\033[1;34m'; M  = '\033[1;35m'; C  = '\033[1;36m'
+W  = '\033[1;37m'; DIM= '\033[2m';    RS = '\033[0m'
 
-# ── Width ─────────────────────────────────────────────────────
-TW  = 60
-BW  = 56
-PAD = (TW - BW) // 2
-LP  = ' ' * PAD
-
-# ── Config ────────────────────────────────────────────────────
-HOME       = os.path.expanduser('~')
-CONFIG     = os.path.join(HOME, '.tyranroot_config')
+TW=60; BW=56; PAD=(TW-BW)//2; LP=' '*PAD
+HOME = os.path.expanduser('~')
+CONFIG = os.path.join(HOME, '.terchan_config')
+ZSHRC  = os.path.join(HOME, '.zshrc')
 TERMUX_BIN = '/data/data/com.termux/files/usr/bin'
 
+# ── Config ────────────────────────────────────────────────────
 def load_config():
     cfg = {
         'USERNAME'    : 'TyranRoot',
         'HOSTNAME'    : 'Termux',
-        'SHELL_COLOR' : 'cyan',
         'PROMPT_STYLE': 'kali',
-        'BANNER_STYLE': '1',
+        'BANNER_TYPE' : 'figlet',
+        'BANNER_TEXT' : 'Ter-Chan',
+        'BANNER_COLOR': 'random',
     }
-    if not os.path.exists(CONFIG):
-        save_config(cfg)
-    else:
+    if os.path.exists(CONFIG):
         with open(CONFIG) as f:
             for line in f:
                 line = line.strip()
                 if '=' in line and not line.startswith('#'):
                     k, v = line.split('=', 1)
                     cfg[k.strip()] = v.strip()
+    else:
+        save_config(cfg)
     return cfg
 
 def save_config(cfg):
@@ -58,642 +46,280 @@ def save_config(cfg):
 cfg = load_config()
 
 # ── Helpers ───────────────────────────────────────────────────
-def cline(left, right):
-    line = '═' * (BW - 2)
-    print(f'{C}{LP}{left}{line}{right}{RS}')
+def cline(l, r):
+    print(f'{C}{LP}{l}{"═"*(BW-2)}{r}{RS}')
 
-def cmid(text, color=None):
-    if color is None:
-        color = W
-    length = len(text)
-    sp  = (BW - 2 - length) // 2
-    sp2 = (BW - 2 - length) - sp
-    sp  = max(sp,  0)
-    sp2 = max(sp2, 0)
-    print(f'{C}{LP}║{" " * sp}{color}{text}{C}{" " * sp2}║{RS}')
+def cmid(text, color=W):
+    ln = len(text); sp=(BW-2-ln)//2; sp2=(BW-2-ln)-sp
+    sp=max(sp,0); sp2=max(sp2,0)
+    print(f'{C}{LP}║{" "*sp}{color}{text}{C}{" "*sp2}║{RS}')
 
 def press_enter():
     print(f'\n{LP}{DIM}Press Enter to continue...{RS}')
     input()
 
-def run(cmd, shell=True):
-    subprocess.run(cmd, shell=shell)
+def run(cmd):
+    subprocess.run(cmd, shell=True)
 
-def pkg_install(*packages):
-    run(f'pkg install -y {" ".join(packages)}')
+def pkg_install(*pkgs):
+    run(f'pkg install -y {" ".join(pkgs)}')
 
-def append_file(path, content):
-    with open(path, 'a') as f:
-        f.write(content)
+def cmd_exists(cmd):
+    return shutil.which(cmd) is not None or \
+           os.path.exists(os.path.join(TERMUX_BIN, cmd))
 
-def remove_block(path, start_marker, end_marker):
+# ── Remove block from zshrc ───────────────────────────────────
+def remove_block(path, marker):
     if not os.path.exists(path):
         return
     with open(path) as f:
-        lines = f.readlines()
-    out    = []
-    inside = False
-    for line in lines:
-        if start_marker in line:
-            inside = True
-        if not inside:
-            out.append(line)
-        if end_marker in line:
-            inside = False
+        content = f.read()
+    start = f'# >>>TERCHAN:{marker}:START'
+    end   = f'# >>>TERCHAN:{marker}:END'
+    while start in content and end in content:
+        s = content.index(start)
+        e = content.index(end) + len(end)
+        content = content[:s] + content[e:]
+    content = '\n'.join(
+        line for line in content.splitlines()
+        if line.strip() != ''
+    ) + '\n'
     with open(path, 'w') as f:
-        f.writelines(out)
+        f.write(content)
 
-# ── Banner ────────────────────────────────────────────────────
-def banner():
-    os.system('clear')
-    print()
-    style = cfg.get('BANNER_STYLE', '1')
+def write_block(path, marker, block):
+    remove_block(path, marker)
+    with open(path, 'a') as f:
+        f.write(f'\n# >>>TERCHAN:{marker}:START\n')
+        f.write(block)
+        f.write(f'\n# >>>TERCHAN:{marker}:END\n')
 
-    if style == '1':
-        print(f'{C}{LP}  ████████╗███████╗██████╗      ██████╗██╗  ██╗ █████╗ ███╗   ██╗{RS}')
-        print(f'{C}{LP}     ██╔══╝██╔════╝██╔══██╗    ██╔════╝██║  ██║██╔══██╗████╗  ██║{RS}')
-        print(f'{G}{LP}     ██║   █████╗  ██████╔╝    ██║     ███████║███████║██╔██╗ ██║{RS}')
-        print(f'{G}{LP}     ██║   ██╔══╝  ██╔══██╗    ██║     ██╔══██║██╔══██║██║╚██╗██║{RS}')
-        print(f'{R}{LP}     ██║   ███████╗██║  ██║    ╚██████╗██║  ██║██║  ██║██║ ╚████║{RS}')
-        print(f'{R}{LP}     ╚═╝   ╚══════╝╚═╝  ╚═╝     ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝{RS}')
-    elif style == '2':
-        print(f'{C}{LP} _______ _____ ____      ____ _   _    _    _   _ ')
-        print(f'{C}{LP}|__   __|  ___|  _ \\    / ___| | | |  / \\  | \\ | |')
-        print(f'{G}{LP}   | |  | |_  | |_) |  | |   | |_| | / _ \\ |  \\| |')
-        print(f'{G}{LP}   | |  |  _| |  _ <   | |___|  _  |/ ___ \\| |\\  |')
-        print(f'{R}{LP}   |_|  |___| |_| \\_\\   \\____|_| |_/_/   \\_\\_| \\_|{RS}')
-        print(f'{R}{LP}         TER-CHAN OS v2.0{RS}')
-    elif style == '3':
-        figlet = os.path.join(TERMUX_BIN, 'figlet')
-        if os.path.exists(figlet):
-            result = subprocess.run([figlet, 'Ter-Chan'], capture_output=True, text=True)
-            for line in result.stdout.splitlines():
-                print(f'{C}{LP}{line}{RS}')
+# ── Apply everything to .zshrc ────────────────────────────────
+def apply_all():
+    """Write banner + prompt block into .zshrc cleanly."""
+    user  = cfg.get('USERNAME', 'TyranRoot')
+    host  = cfg.get('HOSTNAME', 'Termux')
+    style = cfg.get('PROMPT_STYLE', 'kali')
+    btype = cfg.get('BANNER_TYPE', 'figlet')
+    btext = cfg.get('BANNER_TEXT', 'Ter-Chan')
+    bclr  = cfg.get('BANNER_COLOR', 'random')
+
+    # ── Banner block ─────────────────────────────────────────
+    if btype == 'figlet':
+        if bclr == 'random':
+            banner_cmd = f'figlet -f slant "{btext}" | lolcat'
         else:
-            print(f'{C}{LP}  Ter-Chan OS{RS}')
+            color_map = {
+                'red':'\\033[1;31m','green':'\\033[1;32m',
+                'cyan':'\\033[1;36m','yellow':'\\033[1;33m',
+                'blue':'\\033[1;34m','magenta':'\\033[1;35m',
+            }
+            clr = color_map.get(bclr, '\\033[1;36m')
+            banner_cmd = f'echo -e "{clr}"; figlet -f slant "{btext}"; echo -e "\\033[0m"'
+    elif btype == 'neofetch':
+        banner_cmd = 'neofetch'
+    elif btype == 'both':
+        if bclr == 'random':
+            banner_cmd = f'figlet -f slant "{btext}" | lolcat\nneofetch'
+        else:
+            banner_cmd = f'figlet -f slant "{btext}" | lolcat\nneofetch'
 
-    print()
-    cline('╔', '╗')
-    cmid('Ter-Chan OS — Termux Customization v2.0', W)
-    cmid('Fully Optimized for Termux', DIM)
-    cline('╚', '╝')
-    print()
-    print(f'{LP}  {R}[!]{W} User     : {C}{cfg.get("USERNAME","TyranRoot")}{RS}')
-    print(f'{LP}  {R}[!]{W} Host     : {C}{cfg.get("HOSTNAME","Termux")}{RS}')
-    print(f'{LP}  {R}[!]{W} Shell    : {C}{os.path.basename(os.environ.get("SHELL","bash"))}{RS}')
-    print(f'{LP}  {R}[!]{W} Prompt   : {C}{cfg.get("PROMPT_STYLE","kali")}{RS}')
-    print()
+    banner_block = banner_cmd + '\n'
+    write_block(ZSHRC, 'BANNER', banner_block)
 
-# ── Install Base ──────────────────────────────────────────────
-def install_base():
-    print(f'\n{LP}{Y}[▶] Installing base packages...{RS}\n')
-    run('pkg update -y && pkg upgrade -y')
-    pkg_install('zsh', 'fish', 'git', 'curl', 'wget', 'figlet',
-                'toilet', 'ruby', 'bat', 'eza', 'lsd', 'neofetch')
-    run('gem install lolcat 2>/dev/null || true')
-    print(f'\n{LP}{G}[✔] Base packages installed.{RS}')
-    press_enter()
-    menu()
-
-# ── Prompt helpers ────────────────────────────────────────────
-def apply_zsh_prompt(style):
-    user = cfg.get('USERNAME', 'TyranRoot')
-    host = cfg.get('HOSTNAME', 'Termux')
-    rc   = os.path.join(HOME, '.zshrc')
-    remove_block(rc, '# TyranRoot', '')
-
+    # ── Prompt block ─────────────────────────────────────────
     prompts = {
-        'kali': f"""
-# TyranRoot Kali-style prompt
-autoload -Uz vcs_info
+        'kali': f"""autoload -Uz vcs_info
 precmd() {{ vcs_info }}
-zstyle ':vcs_info:git:*' formats '(%b)'
+zstyle ':vcs_info:git:*' formats ' (%b)'
 setopt PROMPT_SUBST
-PROMPT='%F{{red}}┌──(%F{{cyan}}{user}@{host}%F{{red}})-[%F{{white}}%~%F{{red}}]%f$(vcs_info_msg_0_)
-%F{{red}}└─%F{{white}}$ %f'
+PROMPT='%F{{red}}┌──(%F{{cyan}}{user}%F{{white}}@%F{{green}}{host}%F{{red}})-[%F{{white}}%~%F{{red}}]%F{{yellow}}${{vcs_info_msg_0_}}%F{{red}}
+└─%F{{white}}$ %f'
 """,
-        'arrow': f"""
-# TyranRoot Arrow prompt
-PROMPT='%F{{cyan}}╔═[%F{{white}}{user}@{host}%F{{cyan}}]═[%F{{green}}%~%F{{cyan}}]
+        'arrow': f"""setopt PROMPT_SUBST
+PROMPT='%F{{cyan}}╔═[%F{{white}}{user}%F{{cyan}}@%F{{green}}{host}%F{{cyan}}]═[%F{{yellow}}%~%F{{cyan}}]
 %F{{cyan}}╚═▶ %F{{white}}%f'
 """,
-        'minimal': f"""
-# TyranRoot Minimal prompt
+        'minimal': f"""setopt PROMPT_SUBST
 PROMPT='%F{{cyan}}{user}%F{{white}}@%F{{red}}{host} %F{{green}}%~ %F{{yellow}}❯ %f'
 """,
-        'hacker': f"""
-# TyranRoot Hacker prompt
+        'hacker': f"""setopt PROMPT_SUBST
 PROMPT='%F{{green}}[%F{{white}}root@{host}%F{{green}}]-[%F{{red}}%~%F{{green}}]
 %F{{green}}# %f'
 """,
-        'powerline': f"""
-# TyranRoot Powerline prompt
-PROMPT='%K{{blue}}%F{{white}} {user} %k%K{{cyan}}%F{{blue}}%F{{black}} {host} %k%K{{green}}%F{{cyan}}%F{{black}} %~ %k%F{{green}} %f'
+        'powerline': f"""setopt PROMPT_SUBST
+PROMPT='%K{{blue}}%F{{white}} {user} %k%K{{cyan}}%F{{black}} {host} %k%K{{green}}%F{{black}} %~ %k%F{{green}}▶%f '
 """,
     }
-    if style in prompts:
-        append_file(rc, prompts[style])
-    print(f'{LP}{G}[✔] Zsh prompt applied: {style}{RS}')
+    prompt_block = prompts.get(style, prompts['kali'])
+    write_block(ZSHRC, 'PROMPT', prompt_block)
 
-def apply_fish_prompt(style):
-    user = cfg.get('USERNAME', 'TyranRoot')
-    host = cfg.get('HOSTNAME', 'Termux')
-    fish_dir = os.path.join(HOME, '.config', 'fish', 'functions')
-    os.makedirs(fish_dir, exist_ok=True)
-    fish_file = os.path.join(fish_dir, 'fish_prompt.fish')
+    print(f'{LP}{G}[✔] .zshrc updated successfully!{RS}')
+    print(f'{LP}{Y}[!] Run: source ~/.zshrc  — or restart Termux{RS}')
 
-    prompts = {
-        'kali': f"""function fish_prompt
-    set_color red
-    echo -n "┌──("
-    set_color cyan
-    echo -n "{user}@{host}"
-    set_color red
-    echo -n ")-["
-    set_color white
-    echo -n (prompt_pwd)
-    set_color red
-    echo -n "]"
-    echo
-    set_color red
-    echo -n "└─"
-    set_color white
-    echo -n "$ "
-    set_color normal
-end
-""",
-        'arrow': f"""function fish_prompt
-    set_color cyan
-    echo -n "╔═["
-    set_color white
-    echo -n "{user}@{host}"
-    set_color cyan
-    echo -n "]═["
-    set_color green
-    echo -n (prompt_pwd)
-    set_color cyan
-    echo -n "]"
-    echo
-    set_color cyan
-    echo -n "╚═▶ "
-    set_color normal
-end
-""",
-        'hacker': f"""function fish_prompt
-    set_color green
-    echo -n "[root@{host}]-["
-    set_color red
-    echo -n (prompt_pwd)
-    set_color green
-    echo -n "]"
-    echo
-    echo -n "# "
-    set_color normal
-end
-""",
-        'minimal': f"""function fish_prompt
-    set_color cyan
-    echo -n "{user}"
-    set_color white
-    echo -n "@"
-    set_color red
-    echo -n "{host}"
-    set_color green
-    echo -n " "(prompt_pwd)
-    set_color yellow
-    echo -n " ❯ "
-    set_color normal
-end
-""",
-    }
-    if style in prompts:
-        with open(fish_file, 'w') as f:
-            f.write(prompts[style])
-    print(f'{LP}{G}[✔] Fish prompt applied: {style}{RS}')
-
-def apply_bash_prompt(style):
-    user = cfg.get('USERNAME', 'TyranRoot')
-    host = cfg.get('HOSTNAME', 'Termux')
-    rc   = os.path.join(HOME, '.bashrc')
-    remove_block(rc, '# TyranRoot prompt', '')
-
-    prompts = {
-        'kali'    : f"\n# TyranRoot prompt\nPS1='\\[\\033[1;31m\\]┌──(\\[\\033[1;36m\\]{user}@{host}\\[\\033[1;31m\\])-[\\[\\033[1;37m\\]\\w\\[\\033[1;31m\\]]\\n└─\\[\\033[1;37m\\]\\$ \\[\\033[0m\\]'\n",
-        'hacker'  : f"\n# TyranRoot prompt\nPS1='\\[\\033[1;32m\\][root@{host}]-[\\[\\033[1;31m\\]\\w\\[\\033[1;32m\\]]\\n# \\[\\033[0m\\]'\n",
-        'arrow'   : f"\n# TyranRoot prompt\nPS1='\\[\\033[1;36m\\]╔═[\\[\\033[1;37m\\]{user}@{host}\\[\\033[1;36m\\]]═[\\[\\033[1;32m\\]\\w\\[\\033[1;36m\\]]\\n╚═▶ \\[\\033[0m\\]'\n",
-        'minimal' : f"\n# TyranRoot prompt\nPS1='\\[\\033[1;36m\\]{user}\\[\\033[1;37m\\]@\\[\\033[1;31m\\]{host} \\[\\033[1;32m\\]\\w \\[\\033[1;33m\\]❯ \\[\\033[0m\\]'\n",
-    }
-    if style in prompts:
-        append_file(rc, prompts[style])
-    print(f'{LP}{G}[✔] Bash prompt applied: {style}{RS}')
-
-# ── Change Shell ──────────────────────────────────────────────
-def change_shell(shell):
-    paths = {
-        'zsh' : os.path.join(TERMUX_BIN, 'zsh'),
-        'fish': os.path.join(TERMUX_BIN, 'fish'),
-        'bash': os.path.join(TERMUX_BIN, 'bash'),
-    }
-    shell_path = paths.get(shell, '')
-    if os.path.exists(shell_path):
-        termux_dir = os.path.join(HOME, '.termux')
-        os.makedirs(termux_dir, exist_ok=True)
-        with open(os.path.join(termux_dir, 'shell'), 'w') as f:
-            f.write(shell_path + '\n')
-        run('termux-reload-settings 2>/dev/null || true')
-        print(f'{LP}{G}[✔] Shell set to {shell}. Restart Termux to apply.{RS}')
-    else:
-        print(f'{LP}{R}[✘] {shell} not installed. Install first.{RS}')
-
-# ── Zsh Plugins ───────────────────────────────────────────────
-def install_zsh_plugins():
-    print(f'\n{LP}{Y}[▶] Installing Zsh plugins...{RS}\n')
+# ── Auto Install Dependencies ─────────────────────────────────
+def install_deps():
+    print(f'\n{LP}{Y}[▶] Checking & installing dependencies...{RS}\n')
+    run('pkg update -y')
+    to_install = []
+    for pkg in ['zsh','git','curl','figlet','lolcat','neofetch',
+                'ruby','toilet']:
+        if not cmd_exists(pkg):
+            to_install.append(pkg)
+    if to_install:
+        pkg_install(*to_install)
+    # lolcat via gem if not found
+    if not cmd_exists('lolcat'):
+        run('gem install lolcat 2>/dev/null || true')
+    # zsh plugins
     omz = os.path.join(HOME, '.oh-my-zsh')
     if not os.path.exists(omz):
+        print(f'{LP}{Y}[▶] Installing Oh-My-Zsh...{RS}')
         run(f'git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git {omz}')
-        zshrc = os.path.join(HOME, '.zshrc')
-        if not os.path.exists(zshrc):
-            run(f'cp {omz}/templates/zshrc.zsh-template {zshrc}')
-
-    custom = os.environ.get('ZSH_CUSTOM', os.path.join(omz, 'custom'))
-    hl = os.path.join(custom, 'plugins', 'zsh-syntax-highlighting')
+        if not os.path.exists(ZSHRC):
+            run(f'cp {omz}/templates/zshrc.zsh-template {ZSHRC}')
+    custom = os.path.join(omz, 'custom')
+    hl = os.path.join(custom,'plugins','zsh-syntax-highlighting')
     if not os.path.exists(hl):
+        print(f'{LP}{Y}[▶] Installing zsh-syntax-highlighting...{RS}')
         run(f'git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git {hl}')
-    as_ = os.path.join(custom, 'plugins', 'zsh-autosuggestions')
+    as_ = os.path.join(custom,'plugins','zsh-autosuggestions')
     if not os.path.exists(as_):
+        print(f'{LP}{Y}[▶] Installing zsh-autosuggestions...{RS}')
         run(f'git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions.git {as_}')
-
-    zshrc = os.path.join(HOME, '.zshrc')
-    if os.path.exists(zshrc):
-        run(f"sed -i 's/^plugins=.*/plugins=(git zsh-syntax-highlighting zsh-autosuggestions)/' {zshrc}")
-
-    print(f'{LP}{G}[✔] Plugins installed: syntax-highlighting, autosuggestions{RS}')
+    # enable plugins in .zshrc
+    if os.path.exists(ZSHRC):
+        run(f"sed -i 's/^plugins=.*/plugins=(git zsh-syntax-highlighting zsh-autosuggestions)/' {ZSHRC}")
+    # set zsh as default shell
+    zsh_path = os.path.join(TERMUX_BIN, 'zsh')
+    if os.path.exists(zsh_path):
+        termux_dir = os.path.join(HOME, '.termux')
+        os.makedirs(termux_dir, exist_ok=True)
+        with open(os.path.join(termux_dir,'shell'),'w') as f:
+            f.write(zsh_path+'\n')
+        run('termux-reload-settings 2>/dev/null || true')
+    print(f'\n{LP}{G}[✔] All dependencies installed!{RS}')
     press_enter()
-    zsh_menu()
+    menu()
 
-# ── Nerd Font ─────────────────────────────────────────────────
+# ── Install Nerd Font ─────────────────────────────────────────
 def install_font():
     print(f'\n{LP}{Y}[▶] Installing FiraCode Nerd Font...{RS}\n')
-    termux_dir = os.path.join(HOME, '.termux')
+    termux_dir = os.path.join(HOME,'.termux')
     os.makedirs(termux_dir, exist_ok=True)
     url = 'https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/FiraCode/Regular/FiraCodeNerdFont-Regular.ttf'
-    result = run(f'curl -fL "{url}" -o {termux_dir}/font.ttf')
-    if result is None:
-        print(f'{LP}{G}[✔] Font installed. Restart Termux to apply.{RS}')
+    run(f'curl -fL "{url}" -o {termux_dir}/font.ttf')
     run('termux-reload-settings 2>/dev/null || true')
+    print(f'{LP}{G}[✔] Font installed. Restart Termux to apply.{RS}')
     press_enter()
     appearance_menu()
 
-# ── Color Theme ───────────────────────────────────────────────
+# ── Color Themes ──────────────────────────────────────────────
 THEMES = {
-    'hacker': """background=#020c06
-foreground=#00ff41
-cursor=#00ff41
-color0=#020c06
-color1=#ff2244
-color2=#00ff41
-color3=#ffcc00
-color4=#00ccff
-color5=#cc00ff
-color6=#00ffcc
-color7=#b0ffb0
-color8=#1a3a22
-color9=#ff4466
-color10=#33ff66
-color11=#ffdd44
-color12=#33ddff
-color13=#dd33ff
-color14=#33ffdd
-color15=#e0ffe0
-""",
-    'kali': """background=#1a1a2e
-foreground=#e0e0e0
-cursor=#00d4ff
-color0=#1a1a2e
-color1=#ff4444
-color2=#44ff88
-color3=#ffcc00
-color4=#4488ff
-color5=#cc44ff
-color6=#44ffcc
-color7=#e0e0e0
-color8=#2a2a4e
-color9=#ff6666
-color10=#66ffaa
-color11=#ffdd44
-color12=#66aaff
-color13=#dd66ff
-color14=#66ffdd
-color15=#ffffff
-""",
-    'dracula': """background=#282a36
-foreground=#f8f8f2
-cursor=#f8f8f2
-color0=#21222c
-color1=#ff5555
-color2=#50fa7b
-color3=#f1fa8c
-color4=#bd93f9
-color5=#ff79c6
-color6=#8be9fd
-color7=#f8f8f2
-color8=#6272a4
-color9=#ff6e6e
-color10=#69ff94
-color11=#ffffa5
-color12=#d6acff
-color13=#ff92df
-color14=#a4ffff
-color15=#ffffff
-""",
-    'matrix': """background=#000000
-foreground=#00ff00
-cursor=#00ff00
-color0=#000000
-color1=#003300
-color2=#00ff00
-color3=#009900
-color4=#006600
-color5=#00cc00
-color6=#33ff33
-color7=#00ff00
-color8=#002200
-color9=#004400
-color10=#00dd00
-color11=#00bb00
-color12=#008800
-color13=#00ee00
-color14=#44ff44
-color15=#66ff66
-""",
+    'hacker' : 'background=#020c06\nforeground=#00ff41\ncursor=#00ff41\ncolor0=#020c06\ncolor1=#ff2244\ncolor2=#00ff41\ncolor3=#ffcc00\ncolor4=#00ccff\ncolor5=#cc00ff\ncolor6=#00ffcc\ncolor7=#b0ffb0\ncolor8=#1a3a22\ncolor9=#ff4466\ncolor10=#33ff66\ncolor11=#ffdd44\ncolor12=#33ddff\ncolor13=#dd33ff\ncolor14=#33ffdd\ncolor15=#e0ffe0\n',
+    'kali'   : 'background=#1a1a2e\nforeground=#e0e0e0\ncursor=#00d4ff\ncolor0=#1a1a2e\ncolor1=#ff4444\ncolor2=#44ff88\ncolor3=#ffcc00\ncolor4=#4488ff\ncolor5=#cc44ff\ncolor6=#44ffcc\ncolor7=#e0e0e0\ncolor8=#2a2a4e\ncolor9=#ff6666\ncolor10=#66ffaa\ncolor11=#ffdd44\ncolor12=#66aaff\ncolor13=#dd66ff\ncolor14=#66ffdd\ncolor15=#ffffff\n',
+    'dracula' : 'background=#282a36\nforeground=#f8f8f2\ncursor=#f8f8f2\ncolor0=#21222c\ncolor1=#ff5555\ncolor2=#50fa7b\ncolor3=#f1fa8c\ncolor4=#bd93f9\ncolor5=#ff79c6\ncolor6=#8be9fd\ncolor7=#f8f8f2\ncolor8=#6272a4\ncolor9=#ff6e6e\ncolor10=#69ff94\ncolor11=#ffffa5\ncolor12=#d6acff\ncolor13=#ff92df\ncolor14=#a4ffff\ncolor15=#ffffff\n',
+    'matrix'  : 'background=#000000\nforeground=#00ff00\ncursor=#00ff00\ncolor0=#000000\ncolor1=#003300\ncolor2=#00ff00\ncolor3=#009900\ncolor4=#006600\ncolor5=#00cc00\ncolor6=#33ff33\ncolor7=#00ff00\ncolor8=#002200\ncolor9=#004400\ncolor10=#00dd00\ncolor11=#00bb00\ncolor12=#008800\ncolor13=#00ee00\ncolor14=#44ff44\ncolor15=#66ff66\n',
+    'catppuccin': 'background=#1e1e2e\nforeground=#cdd6f4\ncursor=#f5e0dc\ncolor0=#45475a\ncolor1=#f38ba8\ncolor2=#a6e3a1\ncolor3=#f9e2af\ncolor4=#89b4fa\ncolor5=#f5c2e7\ncolor6=#94e2d5\ncolor7=#bac2de\ncolor8=#585b70\ncolor9=#f38ba8\ncolor10=#a6e3a1\ncolor11=#f9e2af\ncolor12=#89b4fa\ncolor13=#f5c2e7\ncolor14=#94e2d5\ncolor15=#a6adc8\n',
 }
 
 def apply_color_theme(theme):
     if theme not in THEMES:
         return
-    termux_dir = os.path.join(HOME, '.termux')
+    termux_dir = os.path.join(HOME,'.termux')
     os.makedirs(termux_dir, exist_ok=True)
-    with open(os.path.join(termux_dir, 'colors.properties'), 'w') as f:
+    with open(os.path.join(termux_dir,'colors.properties'),'w') as f:
         f.write(THEMES[theme])
     run('termux-reload-settings 2>/dev/null || true')
     print(f'{LP}{G}[✔] Theme applied: {theme}{RS}')
 
-# ── Identity ──────────────────────────────────────────────────
-def change_identity():
-    print(f'\n{LP}{C}Current: {W}{cfg.get("USERNAME","TyranRoot")}@{cfg.get("HOSTNAME","Termux")}{RS}')
-    new_user = input(f'{LP}{Y}New username (Enter to keep): {RS}').strip()
-    new_host = input(f'{LP}{Y}New hostname (Enter to keep): {RS}').strip()
-    if new_user:
-        cfg['USERNAME'] = new_user
-    if new_host:
-        cfg['HOSTNAME'] = new_host
-    save_config(cfg)
-    print(f'{LP}{G}[✔] Identity updated: {cfg["USERNAME"]}@{cfg["HOSTNAME"]}{RS}')
-    press_enter()
-    identity_menu()
-
-# ── Security Lock ─────────────────────────────────────────────
-def do_add_lock():
-    print(f'\n{LP}{C}[▶] Setting up terminal security lock...{RS}')
-    new_pass = getpass.getpass(f'{LP}{Y}Create Access Key: {RS}')
-    lock_code = f"""
-#TYRANLOCK_START
-clear
-echo -e '\\033[1;32m  Initializing...\\033[0m'
-sleep 0.3
-clear
-_tl_attempt=1
-while [ $_tl_attempt -le 3 ]; do
-    echo -e "\\n\\033[1;36m╔══════════════════════════════════════╗"
-    echo -e "║  \\033[1;31m⬡ TYRANROOT — SECURE ACCESS \\033[1;36m        ║"
-    echo -e "╚══════════════════════════════════════╝\\033[0m"
-    echo -ne "\\033[1;33m  [Attempt $_tl_attempt/3] Access Key: \\033[0m"
-    read -rs _tl_pass
-    echo
-    if [ "$_tl_pass" = "{new_pass}" ]; then
-        echo -e "\\033[1;32m  ✔ ACCESS GRANTED\\033[0m"
-        sleep 0.8
-        clear
-        break
-    else
-        echo -e "\\033[1;31m  ✘ DENIED\\033[0m"
-        if [ $_tl_attempt -eq 3 ]; then
-            exit 1
-        fi
-        _tl_attempt=$((_tl_attempt+1))
-        sleep 0.5
-    fi
-done
-#TYRANLOCK_END
-"""
-    bashrc = os.path.join(HOME, '.bashrc')
-    append_file(bashrc, lock_code)
-    print(f'{LP}{G}[✔] Security lock added.{RS}')
-    press_enter()
-    security_menu()
-
-def do_remove_lock():
-    for rc in ['.bashrc', '.zshrc', '.config/fish/config.fish']:
-        path = os.path.join(HOME, rc)
-        remove_block(path, '#TYRANLOCK_START', '#TYRANLOCK_END')
-    print(f'{LP}{G}[✔] Security lock removed.{RS}')
-    press_enter()
-    security_menu()
-
-# ── MOTD ──────────────────────────────────────────────────────
-def setup_motd(choice):
-    motd = '/data/data/com.termux/files/usr/etc/motd'
-    if os.path.exists(motd):
-        try:
-            os.remove(motd)
-        except:
-            pass
-
-    if choice == 'neofetch':
-        pkg_install('neofetch')
-        for rc in ['.bashrc', '.zshrc']:
-            path = os.path.join(HOME, rc)
-            if os.path.exists(path):
-                with open(path) as f:
-                    content = f.read()
-                if 'neofetch' not in content:
-                    append_file(path, '\n# TyranRoot MOTD\nneofetch\n')
-        print(f'{LP}{G}[✔] Neofetch set as startup banner.{RS}')
-
-    elif choice == 'custom':
-        cmd = 'echo -e "\\033[1;36m"; figlet "Ter-Chan" 2>/dev/null; echo -e "\\033[1;32m  Termux OS v2.0 | Ter-Chan\\033[0m\\n"'
-        for rc in ['.bashrc', '.zshrc']:
-            path = os.path.join(HOME, rc)
-            if not os.path.exists(path):
-                continue
-            with open(path) as f:
-                content = f.read()
-            if 'TyranRoot MOTD' not in content:
-                append_file(path, f'\n# TyranRoot MOTD\n{cmd}\n')
-        print(f'{LP}{G}[✔] Custom ASCII banner set as startup.{RS}')
-
-    elif choice == 'remove':
-        for rc in ['.bashrc', '.zshrc']:
-            path = os.path.join(HOME, rc)
-            if os.path.exists(path):
-                with open(path) as f:
-                    lines = f.readlines()
-                out = []
-                skip_next = False
-                for line in lines:
-                    if '# TyranRoot MOTD' in line:
-                        skip_next = True
-                        continue
-                    if skip_next:
-                        skip_next = False
-                        continue
-                    out.append(line)
-                with open(path, 'w') as f:
-                    f.writelines(out)
-        print(f'{LP}{G}[✔] Startup banner removed.{RS}')
-
-    press_enter()
-    appearance_menu()
-
 # ══════════════════════════════════════════
-#  MENUS
+#  BANNER MENU
 # ══════════════════════════════════════════
-def menu():
+def banner_config_menu():
     banner()
-    cline('╔', '╗')
-    cmid('MAIN MENU', C)
-    cline('╚', '╝')
+    cline('╔','╗'); cmid('STARTUP BANNER CONFIG',C); cline('╚','╝')
     print()
-    print(f'{LP}  {C}[{W}01{C}]{G} 📦 Install Base Packages')
-    print(f'{LP}  {C}[{W}02{C}]{G} 🐚 Zsh Options')
-    print(f'{LP}  {C}[{W}03{C}]{G} 🐟 Fish Options')
-    print(f'{LP}  {C}[{W}04{C}]{G} 💻 Bash Options')
-    print(f'{LP}  {C}[{W}05{C}]{Y} 🎨 Appearance & Themes')
-    print(f'{LP}  {C}[{W}06{C}]{M} 👤 Identity')
-    print(f'{LP}  {C}[{W}07{C}]{B} 🔒 Security')
-    print(f'{LP}  {C}[{W}00{C}]{R} ✖  Exit')
+    cur_type = cfg.get('BANNER_TYPE','figlet')
+    cur_text = cfg.get('BANNER_TEXT','Ter-Chan')
+    cur_clr  = cfg.get('BANNER_COLOR','random')
+    print(f'{LP}  {DIM}Current: [{cur_type}] "{cur_text}" color={cur_clr}{RS}')
+    print()
+    print(f'{LP}  {C}[{W}01{C}]{G} Banner Type: Figlet + Lolcat  {"◀ active" if cur_type=="figlet" else ""}')
+    print(f'{LP}  {C}[{W}02{C}]{G} Banner Type: Neofetch         {"◀ active" if cur_type=="neofetch" else ""}')
+    print(f'{LP}  {C}[{W}03{C}]{G} Banner Type: Figlet + Neofetch{"◀ active" if cur_type=="both" else ""}')
+    print(f'{LP}  {C}[{W}04{C}]{Y} Change Banner Text  (now: "{cur_text}")')
+    print(f'{LP}  {C}[{W}05{C}]{Y} Banner Color: Random (lolcat) {"◀" if cur_clr=="random" else ""}')
+    print(f'{LP}  {C}[{W}06{C}]{Y} Banner Color: Cyan            {"◀" if cur_clr=="cyan" else ""}')
+    print(f'{LP}  {C}[{W}07{C}]{Y} Banner Color: Green           {"◀" if cur_clr=="green" else ""}')
+    print(f'{LP}  {C}[{W}08{C}]{Y} Banner Color: Red             {"◀" if cur_clr=="red" else ""}')
+    print(f'{LP}  {C}[{W}09{C}]{R} Remove Startup Banner')
+    print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
     print()
     a = input(f'{LP}{C}Selection ❯ {RS}').strip()
 
-    if   a in ('1','01'): install_base()
-    elif a in ('2','02'): zsh_menu()
-    elif a in ('3','03'): fish_menu()
-    elif a in ('4','04'): bash_menu()
-    elif a in ('5','05'): appearance_menu()
-    elif a in ('6','06'): identity_menu()
-    elif a in ('7','07'): security_menu()
+    if a in ('1','01'):
+        cfg['BANNER_TYPE'] = 'figlet'; save_config(cfg)
+        apply_all(); press_enter(); banner_config_menu()
+    elif a in ('2','02'):
+        cfg['BANNER_TYPE'] = 'neofetch'; save_config(cfg)
+        apply_all(); press_enter(); banner_config_menu()
+    elif a in ('3','03'):
+        cfg['BANNER_TYPE'] = 'both'; save_config(cfg)
+        apply_all(); press_enter(); banner_config_menu()
+    elif a in ('4','04'):
+        t = input(f'{LP}{Y}Enter banner text: {RS}').strip()
+        if t:
+            cfg['BANNER_TEXT'] = t; save_config(cfg)
+            apply_all()
+        press_enter(); banner_config_menu()
+    elif a in ('5','05'):
+        cfg['BANNER_COLOR'] = 'random'; save_config(cfg)
+        apply_all(); press_enter(); banner_config_menu()
+    elif a in ('6','06'):
+        cfg['BANNER_COLOR'] = 'cyan'; save_config(cfg)
+        apply_all(); press_enter(); banner_config_menu()
+    elif a in ('7','07'):
+        cfg['BANNER_COLOR'] = 'green'; save_config(cfg)
+        apply_all(); press_enter(); banner_config_menu()
+    elif a in ('8','08'):
+        cfg['BANNER_COLOR'] = 'red'; save_config(cfg)
+        apply_all(); press_enter(); banner_config_menu()
+    elif a in ('9','09'):
+        remove_block(ZSHRC, 'BANNER')
+        print(f'{LP}{G}[✔] Startup banner removed from .zshrc{RS}')
+        press_enter(); banner_config_menu()
     elif a in ('0','00'):
-        print(f'\n{LP}{C}Goodbye, {cfg.get("USERNAME","TyranRoot")}. Stay hacking. 🔐{RS}\n')
-        sys.exit(0)
-    else:
         menu()
+    else:
+        banner_config_menu()
 
-def zsh_menu():
+# ══════════════════════════════════════════
+#  PROMPT MENU
+# ══════════════════════════════════════════
+def prompt_menu():
     banner()
-    cline('╔', '╗')
-    cmid('ZSH OPTIONS', C)
-    cline('╚', '╝')
+    cline('╔','╗'); cmid('ZSH PROMPT STYLE',C); cline('╚','╝')
+    user = cfg.get('USERNAME','TyranRoot')
+    host = cfg.get('HOSTNAME','Termux')
+    cur  = cfg.get('PROMPT_STYLE','kali')
     print()
-    print(f'{LP}  {C}[{W}01{C}]{G} Install Oh-My-Zsh')
-    print(f'{LP}  {C}[{W}02{C}]{G} Switch to Zsh')
-    print(f'{LP}  {C}[{W}03{C}]{Y} Install Plugins')
-    print(f'{LP}  {C}[{W}04{C}]{Y} Apply Prompt Style')
-    print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
+    print(f'{LP}  {DIM}Current username: {user}  |  hostname: {host}{RS}')
     print()
-    a = input(f'{LP}{C}Selection ❯ {RS}').strip()
-
-    if a in ('1','01'):
-        omz = os.path.join(HOME, '.oh-my-zsh')
-        print(f'\n{LP}{Y}Installing Oh-My-Zsh...{RS}')
-        if not os.path.exists(omz):
-            run(f'git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git {omz}')
-        zshrc = os.path.join(HOME, '.zshrc')
-        if not os.path.exists(zshrc):
-            run(f'cp {omz}/templates/zshrc.zsh-template {zshrc}')
-        print(f'{LP}{G}[✔] Done.{RS}')
-        press_enter()
-        zsh_menu()
-    elif a in ('2','02'):
-        change_shell('zsh')
-        press_enter()
-        zsh_menu()
-    elif a in ('3','03'): install_zsh_plugins()
-    elif a in ('4','04'): prompt_style_menu('zsh')
-    elif a in ('0','00'): menu()
-    else: zsh_menu()
-
-def fish_menu():
-    banner()
-    cline('╔', '╗')
-    cmid('FISH OPTIONS', C)
-    cline('╚', '╝')
-    print()
-    print(f'{LP}  {C}[{W}01{C}]{G} Install Fish')
-    print(f'{LP}  {C}[{W}02{C}]{G} Switch to Fish')
-    print(f'{LP}  {C}[{W}03{C}]{Y} Apply Prompt Style')
-    print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
-    print()
-    a = input(f'{LP}{C}Selection ❯ {RS}').strip()
-
-    if a in ('1','01'):
-        pkg_install('fish')
-        print(f'{LP}{G}[✔] Fish installed.{RS}')
-        press_enter()
-        fish_menu()
-    elif a in ('2','02'):
-        change_shell('fish')
-        press_enter()
-        fish_menu()
-    elif a in ('3','03'): prompt_style_menu('fish')
-    elif a in ('0','00'): menu()
-    else: fish_menu()
-
-def bash_menu():
-    banner()
-    cline('╔', '╗')
-    cmid('BASH OPTIONS', C)
-    cline('╚', '╝')
-    print()
-    print(f'{LP}  {C}[{W}01{C}]{G} Switch to Bash')
-    print(f'{LP}  {C}[{W}02{C}]{Y} Apply Prompt Style')
-    print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
-    print()
-    a = input(f'{LP}{C}Selection ❯ {RS}').strip()
-
-    if a in ('1','01'):
-        change_shell('bash')
-        press_enter()
-        bash_menu()
-    elif a in ('2','02'): prompt_style_menu('bash')
-    elif a in ('0','00'): menu()
-    else: bash_menu()
-
-def prompt_style_menu(shell):
-    banner()
-    cline('╔', '╗')
-    cmid(f'PROMPT STYLE — {shell.upper()}', C)
-    cline('╚', '╝')
-    user = cfg.get('USERNAME', 'TyranRoot')
-    host = cfg.get('HOSTNAME', 'Termux')
-    print()
-    print(f'{LP}  {C}[{W}01{C}]{G} Kali Linux Style')
-    print(f'{LP}  {DIM}       ┌──({user}@{host})-[~]')
-    print(f'{LP}       └─${RS}')
-    print()
-    print(f'{LP}  {C}[{W}02{C}]{G} Arrow Style')
-    print(f'{LP}  {DIM}       ╔═[{user}@{host}]═[~]')
-    print(f'{LP}       ╚═▶ {RS}')
-    print()
-    print(f'{LP}  {C}[{W}03{C}]{G} Minimal Style')
-    print(f'{LP}  {DIM}       {user}@{host} ~ ❯ {RS}')
-    print()
-    print(f'{LP}  {C}[{W}04{C}]{G} Hacker Style')
-    print(f'{LP}  {DIM}       [root@{host}]-[~]')
-    print(f'{LP}       # {RS}')
-    print()
-    if shell == 'zsh':
-        print(f'{LP}  {C}[{W}05{C}]{G} Powerline Style')
+    styles = [
+        ('kali',      f'┌──({user}@{host})-[~]\n{LP}       └─$'),
+        ('arrow',     f'╔═[{user}@{host}]═[~]\n{LP}       ╚═▶'),
+        ('minimal',   f'{user}@{host} ~ ❯'),
+        ('hacker',    f'[root@{host}]-[~]\n{LP}       #'),
+        ('powerline', f' {user}  {host}  ~ ▶'),
+    ]
+    for i, (name, preview) in enumerate(styles, 1):
+        active = ' ◀ active' if cur == name else ''
+        print(f'{LP}  {C}[{W}0{i}{C}]{G} {name.capitalize()} Style{R}{active}')
+        print(f'{LP}  {DIM}       {preview}{RS}')
         print()
+    print(f'{LP}  {C}[{W}06{C}]{Y} Change Username')
+    print(f'{LP}  {C}[{W}07{C}]{Y} Change Hostname')
     print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
     print()
     a = input(f'{LP}{C}Selection ❯ {RS}').strip()
@@ -702,118 +328,157 @@ def prompt_style_menu(shell):
                  '3':'minimal','03':'minimal','4':'hacker','04':'hacker',
                  '5':'powerline','05':'powerline'}
 
-    if a in ('0','00'):
-        if shell == 'zsh': zsh_menu()
-        elif shell == 'fish': fish_menu()
-        else: bash_menu()
-        return
-
-    style = style_map.get(a)
-    if style:
-        if shell == 'zsh':   apply_zsh_prompt(style)
-        elif shell == 'fish': apply_fish_prompt(style)
-        else:                 apply_bash_prompt(style)
-        cfg['PROMPT_STYLE'] = style
+    if a in style_map:
+        cfg['PROMPT_STYLE'] = style_map[a]
         save_config(cfg)
-        print(f'{LP}{Y}[!] Restart shell or run: source ~/.{shell}rc{RS}')
-        press_enter()
+        apply_all()
+        press_enter(); prompt_menu()
+    elif a in ('6','06'):
+        u = input(f'{LP}{Y}New username: {RS}').strip()
+        if u: cfg['USERNAME'] = u; save_config(cfg); apply_all()
+        press_enter(); prompt_menu()
+    elif a in ('7','07'):
+        h = input(f'{LP}{Y}New hostname: {RS}').strip()
+        if h: cfg['HOSTNAME'] = h; save_config(cfg); apply_all()
+        press_enter(); prompt_menu()
+    elif a in ('0','00'):
+        menu()
+    else:
+        prompt_menu()
 
-    if shell == 'zsh': zsh_menu()
-    elif shell == 'fish': fish_menu()
-    else: bash_menu()
-
+# ══════════════════════════════════════════
+#  APPEARANCE MENU
+# ══════════════════════════════════════════
 def appearance_menu():
     banner()
-    cline('╔', '╗')
-    cmid('APPEARANCE & THEMES', C)
-    cline('╚', '╝')
+    cline('╔','╗'); cmid('APPEARANCE & THEMES',C); cline('╚','╝')
     print()
     print(f'{LP}  {C}[{W}01{C}]{G} Install FiraCode Nerd Font')
     print(f'{LP}  {C}[{W}02{C}]{Y} Color Theme: Hacker Green')
     print(f'{LP}  {C}[{W}03{C}]{B} Color Theme: Kali Dark')
     print(f'{LP}  {C}[{W}04{C}]{M} Color Theme: Dracula')
     print(f'{LP}  {C}[{W}05{C}]{G} Color Theme: Matrix Black')
-    print(f'{LP}  {C}[{W}06{C}]{W} Startup Banner: Neofetch')
-    print(f'{LP}  {C}[{W}07{C}]{W} Startup Banner: Custom ASCII')
-    print(f'{LP}  {C}[{W}08{C}]{R} Remove Startup Banner')
-    print(f'{LP}  {C}[{W}09{C}]{Y} Change Banner Style')
+    print(f'{LP}  {C}[{W}06{C}]{M} Color Theme: Catppuccin')
     print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
     print()
     a = input(f'{LP}{C}Selection ❯ {RS}').strip()
 
-    if   a in ('1','01'): install_font()
-    elif a in ('2','02'):
-        apply_color_theme('hacker'); press_enter(); appearance_menu()
-    elif a in ('3','03'):
-        apply_color_theme('kali'); press_enter(); appearance_menu()
-    elif a in ('4','04'):
-        apply_color_theme('dracula'); press_enter(); appearance_menu()
-    elif a in ('5','05'):
-        apply_color_theme('matrix'); press_enter(); appearance_menu()
-    elif a in ('6','06'): setup_motd('neofetch')
-    elif a in ('7','07'): setup_motd('custom')
-    elif a in ('8','08'): setup_motd('remove')
-    elif a in ('9','09'): banner_style_menu()
-    elif a in ('0','00'): menu()
-    else: appearance_menu()
-
-def banner_style_menu():
-    banner()
-    cline('╔', '╗')
-    cmid('BANNER STYLE', C)
-    cline('╚', '╝')
-    print()
-    print(f'{LP}  {C}[{W}01{C}]{G} Style 1 — Block Unicode')
-    print(f'{LP}  {C}[{W}02{C}]{G} Style 2 — Compact ASCII')
-    print(f'{LP}  {C}[{W}03{C}]{G} Style 3 — Figlet')
-    print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
-    print()
-    a = input(f'{LP}{C}Selection ❯ {RS}').strip()
-
+    theme_map = {'2':'hacker','02':'hacker','3':'kali','03':'kali',
+                 '4':'dracula','04':'dracula','5':'matrix','05':'matrix',
+                 '6':'catppuccin','06':'catppuccin'}
     if a in ('1','01'):
-        cfg['BANNER_STYLE'] = '1'; save_config(cfg); appearance_menu()
-    elif a in ('2','02'):
-        cfg['BANNER_STYLE'] = '2'; save_config(cfg); appearance_menu()
-    elif a in ('3','03'):
-        cfg['BANNER_STYLE'] = '3'; save_config(cfg); appearance_menu()
-    elif a in ('0','00'): appearance_menu()
-    else: banner_style_menu()
+        install_font()
+    elif a in theme_map:
+        apply_color_theme(theme_map[a])
+        press_enter(); appearance_menu()
+    elif a in ('0','00'):
+        menu()
+    else:
+        appearance_menu()
 
-def identity_menu():
-    banner()
-    cline('╔', '╗')
-    cmid('IDENTITY SETTINGS', C)
-    cline('╚', '╝')
-    print()
-    print(f'{LP}  {C}[{W}01{C}]{G} Change Username & Hostname')
-    print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
-    print()
-    print(f'{LP}  {DIM}Current: {cfg.get("USERNAME","TyranRoot")}@{cfg.get("HOSTNAME","Termux")}{RS}')
-    print()
-    a = input(f'{LP}{C}Selection ❯ {RS}').strip()
+# ══════════════════════════════════════════
+#  SECURITY MENU
+# ══════════════════════════════════════════
+def do_add_lock():
+    print(f'\n{LP}{C}[▶] Setting up terminal lock...{RS}')
+    new_pass = getpass.getpass(f'{LP}{Y}Create Access Key: {RS}')
+    lock = f"""
+_tl_attempt=1
+while [ $_tl_attempt -le 3 ]; do
+    echo -e "\\n\\033[1;36m╔══════════════════════════════════════╗"
+    echo -e "║  \\033[1;31m⬡ TER-CHAN — SECURE ACCESS \\033[1;36m         ║"
+    echo -e "╚══════════════════════════════════════╝\\033[0m"
+    echo -n "\\033[1;33m  [Attempt $_tl_attempt/3] Access Key: \\033[0m"
+    read -rs _tl_pass
+    echo
+    if [ "$_tl_pass" = "{new_pass}" ]; then
+        echo -e "\\033[1;32m  ✔ ACCESS GRANTED\\033[0m"
+        sleep 0.5; clear; break
+    else
+        echo -e "\\033[1;31m  ✘ DENIED\\033[0m"
+        [ $_tl_attempt -eq 3 ] && exit 1
+        _tl_attempt=$((_tl_attempt+1)); sleep 0.5
+    fi
+done
+"""
+    write_block(ZSHRC, 'LOCK', lock)
+    print(f'{LP}{G}[✔] Lock added to .zshrc{RS}')
+    press_enter(); security_menu()
 
-    if   a in ('1','01'): change_identity()
-    elif a in ('0','00'): menu()
-    else: identity_menu()
+def do_remove_lock():
+    remove_block(ZSHRC, 'LOCK')
+    print(f'{LP}{G}[✔] Lock removed from .zshrc{RS}')
+    press_enter(); security_menu()
 
 def security_menu():
     banner()
-    cline('╔', '╗')
-    cmid('SECURITY', C)
-    cline('╚', '╝')
+    cline('╔','╗'); cmid('SECURITY',C); cline('╚','╝')
     print()
     print(f'{LP}  {C}[{W}01{C}]{B} Add Terminal Lock')
     print(f'{LP}  {C}[{W}02{C}]{R} Remove Terminal Lock')
     print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
     print()
     a = input(f'{LP}{C}Selection ❯ {RS}').strip()
-
     if   a in ('1','01'): do_add_lock()
     elif a in ('2','02'): do_remove_lock()
     elif a in ('0','00'): menu()
     else: security_menu()
 
-# ── Entry Point ───────────────────────────────────────────────
+# ══════════════════════════════════════════
+#  TOOL BANNER (screen এ দেখায়)
+# ══════════════════════════════════════════
+def banner():
+    os.system('clear')
+    print()
+    print(f'{C}{LP}  ████████╗███████╗██████╗      ██████╗██╗  ██╗ █████╗ ███╗   ██╗{RS}')
+    print(f'{C}{LP}     ██╔══╝██╔════╝██╔══██╗    ██╔════╝██║  ██║██╔══██╗████╗  ██║{RS}')
+    print(f'{G}{LP}     ██║   █████╗  ██████╔╝    ██║     ███████║███████║██╔██╗ ██║{RS}')
+    print(f'{G}{LP}     ██║   ██╔══╝  ██╔══██╗    ██║     ██╔══██║██╔══██║██║╚██╗██║{RS}')
+    print(f'{R}{LP}     ██║   ███████╗██║  ██║    ╚██████╗██║  ██║██║  ██║██║ ╚████║{RS}')
+    print(f'{R}{LP}     ╚═╝   ╚══════╝╚═╝  ╚═╝     ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝{RS}')
+    print()
+    cline('╔','╗')
+    cmid('Ter-Chan — Termux Customization v3.0', W)
+    cmid('Zsh Edition | Python Powered', DIM)
+    cline('╚','╝')
+    print()
+    print(f'{LP}  {R}[!]{W} User   : {C}{cfg.get("USERNAME","TyranRoot")}{RS}')
+    print(f'{LP}  {R}[!]{W} Host   : {C}{cfg.get("HOSTNAME","Termux")}{RS}')
+    print(f'{LP}  {R}[!]{W} Prompt : {C}{cfg.get("PROMPT_STYLE","kali")}{RS}')
+    print(f'{LP}  {R}[!]{W} Banner : {C}{cfg.get("BANNER_TYPE","figlet")} / {cfg.get("BANNER_TEXT","Ter-Chan")}{RS}')
+    print()
+
+# ══════════════════════════════════════════
+#  MAIN MENU
+# ══════════════════════════════════════════
+def menu():
+    banner()
+    cline('╔','╗'); cmid('MAIN MENU',C); cline('╚','╝')
+    print()
+    print(f'{LP}  {C}[{W}01{C}]{G} 📦 Install All Dependencies')
+    print(f'{LP}  {C}[{W}02{C}]{C} 🎨 Startup Banner Settings')
+    print(f'{LP}  {C}[{W}03{C}]{Y} 💻 Zsh Prompt Style')
+    print(f'{LP}  {C}[{W}04{C}]{M} 🖌️  Appearance & Color Themes')
+    print(f'{LP}  {C}[{W}05{C}]{B} 🔒 Security Lock')
+    print(f'{LP}  {C}[{W}06{C}]{G} ✅ Apply All Changes Now')
+    print(f'{LP}  {C}[{W}00{C}]{R} ✖  Exit')
+    print()
+    a = input(f'{LP}{C}Selection ❯ {RS}').strip()
+
+    if   a in ('1','01'): install_deps()
+    elif a in ('2','02'): banner_config_menu()
+    elif a in ('3','03'): prompt_menu()
+    elif a in ('4','04'): appearance_menu()
+    elif a in ('5','05'): security_menu()
+    elif a in ('6','06'):
+        apply_all(); press_enter(); menu()
+    elif a in ('0','00'):
+        print(f'\n{LP}{C}Goodbye, {cfg.get("USERNAME","TyranRoot")}. Stay hacking. 🔐{RS}')
+        print(f'{LP}{Y}Run: source ~/.zshrc  — to apply changes{RS}\n')
+        sys.exit(0)
+    else:
+        menu()
+
 if __name__ == '__main__':
     try:
         menu()
