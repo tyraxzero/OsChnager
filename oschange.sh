@@ -1,487 +1,639 @@
-#!/usr/bin/env python3
-# ╔══════════════════════════════════════════════════════════════╗
-# ║   Ter-Chan — Termux Customization Tool v3.0                 ║
-# ║   Python Edition | Zsh Focused                              ║
-# ╚══════════════════════════════════════════════════════════════╝
+#!/data/data/com.termux/files/usr/bin/bash
 
-import os, sys, subprocess, getpass, shutil
+# ═══════════════════════════════════════════════
+#   Ter-Chan — Termux Customization Tool v3.0
+#   Bash Edition | Zsh Focused
+# ═══════════════════════════════════════════════
 
-# ── Colors ────────────────────────────────────────────────────
-R  = '\033[1;31m'; G  = '\033[1;32m'; Y  = '\033[1;33m'
-B  = '\033[1;34m'; M  = '\033[1;35m'; C  = '\033[1;36m'
-W  = '\033[1;37m'; DIM= '\033[2m';    RS = '\033[0m'
+R='\033[1;31m'
+G='\033[1;32m'
+Y='\033[1;33m'
+B='\033[1;34m'
+M='\033[1;35m'
+C='\033[1;36m'
+W='\033[1;37m'
+DIM='\033[2m'
+RS='\033[0m'
 
-TW=60; BW=56; PAD=(TW-BW)//2; LP=' '*PAD
-HOME = os.path.expanduser('~')
-CONFIG = os.path.join(HOME, '.terchan_config')
-ZSHRC  = os.path.join(HOME, '.zshrc')
-TERMUX_BIN = '/data/data/com.termux/files/usr/bin'
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONFIG="$HOME/.terchan_config"
+ZSHRC="$HOME/.zshrc"
 
-# ── Config ────────────────────────────────────────────────────
-def load_config():
-    cfg = {
-        'USERNAME'    : 'TyranRoot',
-        'HOSTNAME'    : 'Termux',
-        'PROMPT_STYLE': 'kali',
-        'BANNER_TYPE' : 'figlet',
-        'BANNER_TEXT' : 'Ter-Chan',
-        'BANNER_COLOR': 'random',
-    }
-    if os.path.exists(CONFIG):
-        with open(CONFIG) as f:
-            for line in f:
-                line = line.strip()
-                if '=' in line and not line.startswith('#'):
-                    k, v = line.split('=', 1)
-                    cfg[k.strip()] = v.strip()
-    else:
-        save_config(cfg)
-    return cfg
+# ── Config ────────────────────────────────────
+load_config() {
+    USERNAME="TyranRoot"
+    HOSTNAME="Termux"
+    PROMPT_STYLE="kali"
+    BANNER_TYPE="figlet"
+    BANNER_TEXT="Ter-Chan"
+    BANNER_COLOR="random"
 
-def save_config(cfg):
-    with open(CONFIG, 'w') as f:
-        for k, v in cfg.items():
-            f.write(f'{k}={v}\n')
-
-cfg = load_config()
-
-# ── Helpers ───────────────────────────────────────────────────
-def cline(l, r):
-    print(f'{C}{LP}{l}{"═"*(BW-2)}{r}{RS}')
-
-def cmid(text, color=W):
-    ln = len(text); sp=(BW-2-ln)//2; sp2=(BW-2-ln)-sp
-    sp=max(sp,0); sp2=max(sp2,0)
-    print(f'{C}{LP}║{" "*sp}{color}{text}{C}{" "*sp2}║{RS}')
-
-def press_enter():
-    print(f'\n{LP}{DIM}Press Enter to continue...{RS}')
-    input()
-
-def run(cmd):
-    subprocess.run(cmd, shell=True)
-
-def pkg_install(*pkgs):
-    run(f'pkg install -y {" ".join(pkgs)}')
-
-def cmd_exists(cmd):
-    return shutil.which(cmd) is not None or \
-           os.path.exists(os.path.join(TERMUX_BIN, cmd))
-
-# ── Remove block from zshrc ───────────────────────────────────
-def remove_block(path, marker):
-    if not os.path.exists(path):
-        return
-    with open(path) as f:
-        content = f.read()
-    start = f'# >>>TERCHAN:{marker}:START'
-    end   = f'# >>>TERCHAN:{marker}:END'
-    while start in content and end in content:
-        s = content.index(start)
-        e = content.index(end) + len(end)
-        content = content[:s] + content[e:]
-    content = '\n'.join(
-        line for line in content.splitlines()
-        if line.strip() != ''
-    ) + '\n'
-    with open(path, 'w') as f:
-        f.write(content)
-
-def write_block(path, marker, block):
-    remove_block(path, marker)
-    with open(path, 'a') as f:
-        f.write(f'\n# >>>TERCHAN:{marker}:START\n')
-        f.write(block)
-        f.write(f'\n# >>>TERCHAN:{marker}:END\n')
-
-# ── Apply everything to .zshrc ────────────────────────────────
-def apply_all():
-    """Write banner + prompt block into .zshrc cleanly."""
-    user  = cfg.get('USERNAME', 'TyranRoot')
-    host  = cfg.get('HOSTNAME', 'Termux')
-    style = cfg.get('PROMPT_STYLE', 'kali')
-    btype = cfg.get('BANNER_TYPE', 'figlet')
-    btext = cfg.get('BANNER_TEXT', 'Ter-Chan')
-    bclr  = cfg.get('BANNER_COLOR', 'random')
-
-    # ── Banner block ─────────────────────────────────────────
-    if btype == 'figlet':
-        if bclr == 'random':
-            banner_cmd = f'figlet -f slant "{btext}" | lolcat'
-        else:
-            color_map = {
-                'red':'\\033[1;31m','green':'\\033[1;32m',
-                'cyan':'\\033[1;36m','yellow':'\\033[1;33m',
-                'blue':'\\033[1;34m','magenta':'\\033[1;35m',
-            }
-            clr = color_map.get(bclr, '\\033[1;36m')
-            banner_cmd = f'echo -e "{clr}"; figlet -f slant "{btext}"; echo -e "\\033[0m"'
-    elif btype == 'neofetch':
-        banner_cmd = 'neofetch'
-    elif btype == 'both':
-        if bclr == 'random':
-            banner_cmd = f'figlet -f slant "{btext}" | lolcat\nneofetch'
-        else:
-            banner_cmd = f'figlet -f slant "{btext}" | lolcat\nneofetch'
-
-    banner_block = banner_cmd + '\n'
-    write_block(ZSHRC, 'BANNER', banner_block)
-
-    # ── Prompt block ─────────────────────────────────────────
-    prompts = {
-        'kali': f"""autoload -Uz vcs_info
-precmd() {{ vcs_info }}
-zstyle ':vcs_info:git:*' formats ' (%b)'
-setopt PROMPT_SUBST
-PROMPT='%F{{red}}┌──(%F{{cyan}}{user}%F{{white}}@%F{{green}}{host}%F{{red}})-[%F{{white}}%~%F{{red}}]%F{{yellow}}${{vcs_info_msg_0_}}%F{{red}}
-└─%F{{white}}$ %f'
-""",
-        'arrow': f"""setopt PROMPT_SUBST
-PROMPT='%F{{cyan}}╔═[%F{{white}}{user}%F{{cyan}}@%F{{green}}{host}%F{{cyan}}]═[%F{{yellow}}%~%F{{cyan}}]
-%F{{cyan}}╚═▶ %F{{white}}%f'
-""",
-        'minimal': f"""setopt PROMPT_SUBST
-PROMPT='%F{{cyan}}{user}%F{{white}}@%F{{red}}{host} %F{{green}}%~ %F{{yellow}}❯ %f'
-""",
-        'hacker': f"""setopt PROMPT_SUBST
-PROMPT='%F{{green}}[%F{{white}}root@{host}%F{{green}}]-[%F{{red}}%~%F{{green}}]
-%F{{green}}# %f'
-""",
-        'powerline': f"""setopt PROMPT_SUBST
-PROMPT='%K{{blue}}%F{{white}} {user} %k%K{{cyan}}%F{{black}} {host} %k%K{{green}}%F{{black}} %~ %k%F{{green}}▶%f '
-""",
-    }
-    prompt_block = prompts.get(style, prompts['kali'])
-    write_block(ZSHRC, 'PROMPT', prompt_block)
-
-    print(f'{LP}{G}[✔] .zshrc updated successfully!{RS}')
-    print(f'{LP}{Y}[!] Run: source ~/.zshrc  — or restart Termux{RS}')
-
-# ── Auto Install Dependencies ─────────────────────────────────
-def install_deps():
-    print(f'\n{LP}{Y}[▶] Checking & installing dependencies...{RS}\n')
-    run('pkg update -y')
-    to_install = []
-    for pkg in ['zsh','git','curl','figlet','lolcat','neofetch',
-                'ruby','toilet']:
-        if not cmd_exists(pkg):
-            to_install.append(pkg)
-    if to_install:
-        pkg_install(*to_install)
-    # lolcat via gem if not found
-    if not cmd_exists('lolcat'):
-        run('gem install lolcat 2>/dev/null || true')
-    # zsh plugins
-    omz = os.path.join(HOME, '.oh-my-zsh')
-    if not os.path.exists(omz):
-        print(f'{LP}{Y}[▶] Installing Oh-My-Zsh...{RS}')
-        run(f'git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git {omz}')
-        if not os.path.exists(ZSHRC):
-            run(f'cp {omz}/templates/zshrc.zsh-template {ZSHRC}')
-    custom = os.path.join(omz, 'custom')
-    hl = os.path.join(custom,'plugins','zsh-syntax-highlighting')
-    if not os.path.exists(hl):
-        print(f'{LP}{Y}[▶] Installing zsh-syntax-highlighting...{RS}')
-        run(f'git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git {hl}')
-    as_ = os.path.join(custom,'plugins','zsh-autosuggestions')
-    if not os.path.exists(as_):
-        print(f'{LP}{Y}[▶] Installing zsh-autosuggestions...{RS}')
-        run(f'git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions.git {as_}')
-    # enable plugins in .zshrc
-    if os.path.exists(ZSHRC):
-        run(f"sed -i 's/^plugins=.*/plugins=(git zsh-syntax-highlighting zsh-autosuggestions)/' {ZSHRC}")
-    # set zsh as default shell
-    zsh_path = os.path.join(TERMUX_BIN, 'zsh')
-    if os.path.exists(zsh_path):
-        termux_dir = os.path.join(HOME, '.termux')
-        os.makedirs(termux_dir, exist_ok=True)
-        with open(os.path.join(termux_dir,'shell'),'w') as f:
-            f.write(zsh_path+'\n')
-        run('termux-reload-settings 2>/dev/null || true')
-    print(f'\n{LP}{G}[✔] All dependencies installed!{RS}')
-    press_enter()
-    menu()
-
-# ── Install Nerd Font ─────────────────────────────────────────
-def install_font():
-    print(f'\n{LP}{Y}[▶] Installing FiraCode Nerd Font...{RS}\n')
-    termux_dir = os.path.join(HOME,'.termux')
-    os.makedirs(termux_dir, exist_ok=True)
-    url = 'https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/FiraCode/Regular/FiraCodeNerdFont-Regular.ttf'
-    run(f'curl -fL "{url}" -o {termux_dir}/font.ttf')
-    run('termux-reload-settings 2>/dev/null || true')
-    print(f'{LP}{G}[✔] Font installed. Restart Termux to apply.{RS}')
-    press_enter()
-    appearance_menu()
-
-# ── Color Themes ──────────────────────────────────────────────
-THEMES = {
-    'hacker' : 'background=#020c06\nforeground=#00ff41\ncursor=#00ff41\ncolor0=#020c06\ncolor1=#ff2244\ncolor2=#00ff41\ncolor3=#ffcc00\ncolor4=#00ccff\ncolor5=#cc00ff\ncolor6=#00ffcc\ncolor7=#b0ffb0\ncolor8=#1a3a22\ncolor9=#ff4466\ncolor10=#33ff66\ncolor11=#ffdd44\ncolor12=#33ddff\ncolor13=#dd33ff\ncolor14=#33ffdd\ncolor15=#e0ffe0\n',
-    'kali'   : 'background=#1a1a2e\nforeground=#e0e0e0\ncursor=#00d4ff\ncolor0=#1a1a2e\ncolor1=#ff4444\ncolor2=#44ff88\ncolor3=#ffcc00\ncolor4=#4488ff\ncolor5=#cc44ff\ncolor6=#44ffcc\ncolor7=#e0e0e0\ncolor8=#2a2a4e\ncolor9=#ff6666\ncolor10=#66ffaa\ncolor11=#ffdd44\ncolor12=#66aaff\ncolor13=#dd66ff\ncolor14=#66ffdd\ncolor15=#ffffff\n',
-    'dracula' : 'background=#282a36\nforeground=#f8f8f2\ncursor=#f8f8f2\ncolor0=#21222c\ncolor1=#ff5555\ncolor2=#50fa7b\ncolor3=#f1fa8c\ncolor4=#bd93f9\ncolor5=#ff79c6\ncolor6=#8be9fd\ncolor7=#f8f8f2\ncolor8=#6272a4\ncolor9=#ff6e6e\ncolor10=#69ff94\ncolor11=#ffffa5\ncolor12=#d6acff\ncolor13=#ff92df\ncolor14=#a4ffff\ncolor15=#ffffff\n',
-    'matrix'  : 'background=#000000\nforeground=#00ff00\ncursor=#00ff00\ncolor0=#000000\ncolor1=#003300\ncolor2=#00ff00\ncolor3=#009900\ncolor4=#006600\ncolor5=#00cc00\ncolor6=#33ff33\ncolor7=#00ff00\ncolor8=#002200\ncolor9=#004400\ncolor10=#00dd00\ncolor11=#00bb00\ncolor12=#008800\ncolor13=#00ee00\ncolor14=#44ff44\ncolor15=#66ff66\n',
-    'catppuccin': 'background=#1e1e2e\nforeground=#cdd6f4\ncursor=#f5e0dc\ncolor0=#45475a\ncolor1=#f38ba8\ncolor2=#a6e3a1\ncolor3=#f9e2af\ncolor4=#89b4fa\ncolor5=#f5c2e7\ncolor6=#94e2d5\ncolor7=#bac2de\ncolor8=#585b70\ncolor9=#f38ba8\ncolor10=#a6e3a1\ncolor11=#f9e2af\ncolor12=#89b4fa\ncolor13=#f5c2e7\ncolor14=#94e2d5\ncolor15=#a6adc8\n',
+    if [ -f "$CONFIG" ]; then
+        while IFS='=' read -r key val; do
+            [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+            case "$key" in
+                USERNAME)     USERNAME="$val"     ;;
+                HOSTNAME)     HOSTNAME="$val"     ;;
+                PROMPT_STYLE) PROMPT_STYLE="$val" ;;
+                BANNER_TYPE)  BANNER_TYPE="$val"  ;;
+                BANNER_TEXT)  BANNER_TEXT="$val"  ;;
+                BANNER_COLOR) BANNER_COLOR="$val" ;;
+            esac
+        done < "$CONFIG"
+    else
+        save_config
+    fi
 }
 
-def apply_color_theme(theme):
-    if theme not in THEMES:
-        return
-    termux_dir = os.path.join(HOME,'.termux')
-    os.makedirs(termux_dir, exist_ok=True)
-    with open(os.path.join(termux_dir,'colors.properties'),'w') as f:
-        f.write(THEMES[theme])
-    run('termux-reload-settings 2>/dev/null || true')
-    print(f'{LP}{G}[✔] Theme applied: {theme}{RS}')
+save_config() {
+    cat > "$CONFIG" <<EOF
+USERNAME=$USERNAME
+HOSTNAME=$HOSTNAME
+PROMPT_STYLE=$PROMPT_STYLE
+BANNER_TYPE=$BANNER_TYPE
+BANNER_TEXT=$BANNER_TEXT
+BANNER_COLOR=$BANNER_COLOR
+EOF
+}
 
-# ══════════════════════════════════════════
-#  BANNER MENU
-# ══════════════════════════════════════════
-def banner_config_menu():
-    banner()
-    cline('╔','╗'); cmid('STARTUP BANNER CONFIG',C); cline('╚','╝')
-    print()
-    cur_type = cfg.get('BANNER_TYPE','figlet')
-    cur_text = cfg.get('BANNER_TEXT','Ter-Chan')
-    cur_clr  = cfg.get('BANNER_COLOR','random')
-    print(f'{LP}  {DIM}Current: [{cur_type}] "{cur_text}" color={cur_clr}{RS}')
-    print()
-    print(f'{LP}  {C}[{W}01{C}]{G} Banner Type: Figlet + Lolcat  {"◀ active" if cur_type=="figlet" else ""}')
-    print(f'{LP}  {C}[{W}02{C}]{G} Banner Type: Neofetch         {"◀ active" if cur_type=="neofetch" else ""}')
-    print(f'{LP}  {C}[{W}03{C}]{G} Banner Type: Figlet + Neofetch{"◀ active" if cur_type=="both" else ""}')
-    print(f'{LP}  {C}[{W}04{C}]{Y} Change Banner Text  (now: "{cur_text}")')
-    print(f'{LP}  {C}[{W}05{C}]{Y} Banner Color: Random (lolcat) {"◀" if cur_clr=="random" else ""}')
-    print(f'{LP}  {C}[{W}06{C}]{Y} Banner Color: Cyan            {"◀" if cur_clr=="cyan" else ""}')
-    print(f'{LP}  {C}[{W}07{C}]{Y} Banner Color: Green           {"◀" if cur_clr=="green" else ""}')
-    print(f'{LP}  {C}[{W}08{C}]{Y} Banner Color: Red             {"◀" if cur_clr=="red" else ""}')
-    print(f'{LP}  {C}[{W}09{C}]{R} Remove Startup Banner')
-    print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
-    print()
-    a = input(f'{LP}{C}Selection ❯ {RS}').strip()
+# ── Remove block from zshrc ───────────────────
+remove_block() {
+    local marker="$1"
+    local file="$ZSHRC"
+    [ ! -f "$file" ] && return
+    local tmp="$file.tmp"
+    local inside=0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" == "# >>>TERCHAN:${marker}:START" ]]; then
+            inside=1; continue
+        fi
+        if [[ "$line" == "# >>>TERCHAN:${marker}:END" ]]; then
+            inside=0; continue
+        fi
+        [ $inside -eq 0 ] && echo "$line"
+    done < "$file" > "$tmp"
+    mv "$tmp" "$file"
+}
 
-    if a in ('1','01'):
-        cfg['BANNER_TYPE'] = 'figlet'; save_config(cfg)
-        apply_all(); press_enter(); banner_config_menu()
-    elif a in ('2','02'):
-        cfg['BANNER_TYPE'] = 'neofetch'; save_config(cfg)
-        apply_all(); press_enter(); banner_config_menu()
-    elif a in ('3','03'):
-        cfg['BANNER_TYPE'] = 'both'; save_config(cfg)
-        apply_all(); press_enter(); banner_config_menu()
-    elif a in ('4','04'):
-        t = input(f'{LP}{Y}Enter banner text: {RS}').strip()
-        if t:
-            cfg['BANNER_TEXT'] = t; save_config(cfg)
-            apply_all()
-        press_enter(); banner_config_menu()
-    elif a in ('5','05'):
-        cfg['BANNER_COLOR'] = 'random'; save_config(cfg)
-        apply_all(); press_enter(); banner_config_menu()
-    elif a in ('6','06'):
-        cfg['BANNER_COLOR'] = 'cyan'; save_config(cfg)
-        apply_all(); press_enter(); banner_config_menu()
-    elif a in ('7','07'):
-        cfg['BANNER_COLOR'] = 'green'; save_config(cfg)
-        apply_all(); press_enter(); banner_config_menu()
-    elif a in ('8','08'):
-        cfg['BANNER_COLOR'] = 'red'; save_config(cfg)
-        apply_all(); press_enter(); banner_config_menu()
-    elif a in ('9','09'):
-        remove_block(ZSHRC, 'BANNER')
-        print(f'{LP}{G}[✔] Startup banner removed from .zshrc{RS}')
-        press_enter(); banner_config_menu()
-    elif a in ('0','00'):
-        menu()
-    else:
-        banner_config_menu()
+write_block() {
+    local marker="$1"
+    local content="$2"
+    remove_block "$marker"
+    {
+        echo ""
+        echo "# >>>TERCHAN:${marker}:START"
+        echo "$content"
+        echo "# >>>TERCHAN:${marker}:END"
+    } >> "$ZSHRC"
+}
 
-# ══════════════════════════════════════════
-#  PROMPT MENU
-# ══════════════════════════════════════════
-def prompt_menu():
-    banner()
-    cline('╔','╗'); cmid('ZSH PROMPT STYLE',C); cline('╚','╝')
-    user = cfg.get('USERNAME','TyranRoot')
-    host = cfg.get('HOSTNAME','Termux')
-    cur  = cfg.get('PROMPT_STYLE','kali')
-    print()
-    print(f'{LP}  {DIM}Current username: {user}  |  hostname: {host}{RS}')
-    print()
-    styles = [
-        ('kali',      f'┌──({user}@{host})-[~]\n{LP}       └─$'),
-        ('arrow',     f'╔═[{user}@{host}]═[~]\n{LP}       ╚═▶'),
-        ('minimal',   f'{user}@{host} ~ ❯'),
-        ('hacker',    f'[root@{host}]-[~]\n{LP}       #'),
-        ('powerline', f' {user}  {host}  ~ ▶'),
-    ]
-    for i, (name, preview) in enumerate(styles, 1):
-        active = ' ◀ active' if cur == name else ''
-        print(f'{LP}  {C}[{W}0{i}{C}]{G} {name.capitalize()} Style{R}{active}')
-        print(f'{LP}  {DIM}       {preview}{RS}')
-        print()
-    print(f'{LP}  {C}[{W}06{C}]{Y} Change Username')
-    print(f'{LP}  {C}[{W}07{C}]{Y} Change Hostname')
-    print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
-    print()
-    a = input(f'{LP}{C}Selection ❯ {RS}').strip()
+# ── Apply banner + prompt to .zshrc ──────────
+apply_all() {
+    # ── Banner ──
+    local banner_cmd=""
+    if [ "$BANNER_TYPE" = "figlet" ]; then
+        if [ "$BANNER_COLOR" = "random" ]; then
+            banner_cmd="figlet -f slant \"${BANNER_TEXT}\" | lolcat"
+        else
+            case "$BANNER_COLOR" in
+                red)     clr='\033[1;31m' ;;
+                green)   clr='\033[1;32m' ;;
+                yellow)  clr='\033[1;33m' ;;
+                blue)    clr='\033[1;34m' ;;
+                magenta) clr='\033[1;35m' ;;
+                *)       clr='\033[1;36m' ;;
+            esac
+            banner_cmd="echo -e \"${clr}\"; figlet -f slant \"${BANNER_TEXT}\"; echo -e \"\033[0m\""
+        fi
+    elif [ "$BANNER_TYPE" = "neofetch" ]; then
+        banner_cmd="neofetch"
+    elif [ "$BANNER_TYPE" = "both" ]; then
+        banner_cmd="figlet -f slant \"${BANNER_TEXT}\" | lolcat
+neofetch"
+    fi
 
-    style_map = {'1':'kali','01':'kali','2':'arrow','02':'arrow',
-                 '3':'minimal','03':'minimal','4':'hacker','04':'hacker',
-                 '5':'powerline','05':'powerline'}
+    write_block "BANNER" "$banner_cmd"
 
-    if a in style_map:
-        cfg['PROMPT_STYLE'] = style_map[a]
-        save_config(cfg)
-        apply_all()
-        press_enter(); prompt_menu()
-    elif a in ('6','06'):
-        u = input(f'{LP}{Y}New username: {RS}').strip()
-        if u: cfg['USERNAME'] = u; save_config(cfg); apply_all()
-        press_enter(); prompt_menu()
-    elif a in ('7','07'):
-        h = input(f'{LP}{Y}New hostname: {RS}').strip()
-        if h: cfg['HOSTNAME'] = h; save_config(cfg); apply_all()
-        press_enter(); prompt_menu()
-    elif a in ('0','00'):
-        menu()
-    else:
-        prompt_menu()
+    # ── Prompt ──
+    local prompt_block=""
+    case "$PROMPT_STYLE" in
+        kali)
+            prompt_block="autoload -Uz vcs_info
+precmd() { vcs_info }
+zstyle ':vcs_info:git:*' formats ' (%b)'
+setopt PROMPT_SUBST
+PROMPT='%F{red}┌──(%F{cyan}${USERNAME}%F{white}@%F{green}${HOSTNAME}%F{red})-[%F{white}%~%F{red}]\${vcs_info_msg_0_}
+%F{red}└─%F{white}\$ %f'"
+            ;;
+        arrow)
+            prompt_block="setopt PROMPT_SUBST
+PROMPT='%F{cyan}╔═[%F{white}${USERNAME}%F{cyan}@%F{green}${HOSTNAME}%F{cyan}]═[%F{yellow}%~%F{cyan}]
+%F{cyan}╚═▶ %F{white}%f'"
+            ;;
+        minimal)
+            prompt_block="setopt PROMPT_SUBST
+PROMPT='%F{cyan}${USERNAME}%F{white}@%F{red}${HOSTNAME} %F{green}%~ %F{yellow}❯ %f'"
+            ;;
+        hacker)
+            prompt_block="setopt PROMPT_SUBST
+PROMPT='%F{green}[%F{white}root@${HOSTNAME}%F{green}]-[%F{red}%~%F{green}]
+%F{green}# %f'"
+            ;;
+        powerline)
+            prompt_block="setopt PROMPT_SUBST
+PROMPT='%K{blue}%F{white} ${USERNAME} %k%K{cyan}%F{black} ${HOSTNAME} %k%K{green}%F{black} %~ %k%F{green}▶%f '"
+            ;;
+    esac
 
-# ══════════════════════════════════════════
-#  APPEARANCE MENU
-# ══════════════════════════════════════════
-def appearance_menu():
-    banner()
-    cline('╔','╗'); cmid('APPEARANCE & THEMES',C); cline('╚','╝')
-    print()
-    print(f'{LP}  {C}[{W}01{C}]{G} Install FiraCode Nerd Font')
-    print(f'{LP}  {C}[{W}02{C}]{Y} Color Theme: Hacker Green')
-    print(f'{LP}  {C}[{W}03{C}]{B} Color Theme: Kali Dark')
-    print(f'{LP}  {C}[{W}04{C}]{M} Color Theme: Dracula')
-    print(f'{LP}  {C}[{W}05{C}]{G} Color Theme: Matrix Black')
-    print(f'{LP}  {C}[{W}06{C}]{M} Color Theme: Catppuccin')
-    print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
-    print()
-    a = input(f'{LP}{C}Selection ❯ {RS}').strip()
+    write_block "PROMPT" "$prompt_block"
 
-    theme_map = {'2':'hacker','02':'hacker','3':'kali','03':'kali',
-                 '4':'dracula','04':'dracula','5':'matrix','05':'matrix',
-                 '6':'catppuccin','06':'catppuccin'}
-    if a in ('1','01'):
-        install_font()
-    elif a in theme_map:
-        apply_color_theme(theme_map[a])
-        press_enter(); appearance_menu()
-    elif a in ('0','00'):
-        menu()
-    else:
-        appearance_menu()
+    echo -e "\n${G}[✔] .zshrc updated successfully!${RS}"
+    echo -e "${Y}[!] Run: source ~/.zshrc  — or restart Termux${RS}\n"
+}
 
-# ══════════════════════════════════════════
-#  SECURITY MENU
-# ══════════════════════════════════════════
-def do_add_lock():
-    print(f'\n{LP}{C}[▶] Setting up terminal lock...{RS}')
-    new_pass = getpass.getpass(f'{LP}{Y}Create Access Key: {RS}')
-    lock = f"""
-_tl_attempt=1
-while [ $_tl_attempt -le 3 ]; do
-    echo -e "\\n\\033[1;36m╔══════════════════════════════════════╗"
-    echo -e "║  \\033[1;31m⬡ TER-CHAN — SECURE ACCESS \\033[1;36m         ║"
-    echo -e "╚══════════════════════════════════════╝\\033[0m"
-    echo -n "\\033[1;33m  [Attempt $_tl_attempt/3] Access Key: \\033[0m"
-    read -rs _tl_pass
-    echo
-    if [ "$_tl_pass" = "{new_pass}" ]; then
-        echo -e "\\033[1;32m  ✔ ACCESS GRANTED\\033[0m"
-        sleep 0.5; clear; break
+# ── Tool Banner ───────────────────────────────
+banner() {
+    clear
+
+    echo -e ""
+    echo -e "${C} ______          _____ _"
+    echo -e "${C}/_  __/__ ____  / ___/| |"
+    echo -e "${G} / / / -_) __/ / /__  | |__  __ _ _ __"
+    echo -e "${G}/_/  \__/_/    \___/  |____||__,_|_/  \\"
+    echo -e "${R}                    | |__  __ _ _ __"
+    echo -e "${R}                    |____||__,_|_/  \\ ${RS}"
+    echo -e ""
+    echo -e "${W}      --[ ${G}Ter-Chan Termux Tool v3.0 ${W}]--"
+    echo -e ""
+    echo -e "${R} [!]${W} User    : ${C}${USERNAME}"
+    echo -e "${R} [!]${W} Host    : ${C}${HOSTNAME}"
+    echo -e "${R} [!]${W} Prompt  : ${C}${PROMPT_STYLE}"
+    echo -e "${R} [!]${W} Banner  : ${C}${BANNER_TYPE} / ${BANNER_TEXT} / ${BANNER_COLOR}"
+    echo -e ""
+    echo -e "${G} ==============================================${RS}"
+    echo -e ""
+}
+
+press_enter() {
+    echo -e "\n${DIM}Press Enter to continue...${RS}"
+    read -r
+}
+
+# ── Install Dependencies ──────────────────────
+do_install_deps() {
+    echo -e "\n${Y}[▶] Updating packages...${RS}"
+    pkg update -y && pkg upgrade -y
+
+    echo -e "\n${Y}[▶] Installing required packages...${RS}"
+    pkg install -y zsh git curl wget figlet toilet ruby neofetch
+
+    echo -e "\n${Y}[▶] Installing lolcat...${RS}"
+    gem install lolcat 2>/dev/null || echo -e "${Y}[!] lolcat may need manual install${RS}"
+
+    # Oh-My-Zsh
+    if [ ! -d "$HOME/.oh-my-zsh" ]; then
+        echo -e "\n${Y}[▶] Installing Oh-My-Zsh...${RS}"
+        git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git "$HOME/.oh-my-zsh"
+        [ ! -f "$ZSHRC" ] && cp "$HOME/.oh-my-zsh/templates/zshrc.zsh-template" "$ZSHRC"
+    fi
+
+    # Plugins
+    ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+    local HL="$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
+    local AS="$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+
+    if [ ! -d "$HL" ]; then
+        echo -e "\n${Y}[▶] Installing zsh-syntax-highlighting...${RS}"
+        git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git "$HL"
+    fi
+    if [ ! -d "$AS" ]; then
+        echo -e "\n${Y}[▶] Installing zsh-autosuggestions...${RS}"
+        git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions.git "$AS"
+    fi
+
+    # Enable plugins
+    if [ -f "$ZSHRC" ]; then
+        sed -i 's/^plugins=.*/plugins=(git zsh-syntax-highlighting zsh-autosuggestions)/' "$ZSHRC"
+    fi
+
+    # Set zsh as default
+    local zsh_path="/data/data/com.termux/files/usr/bin/zsh"
+    if [ -f "$zsh_path" ]; then
+        mkdir -p "$HOME/.termux"
+        echo "$zsh_path" > "$HOME/.termux/shell"
+        termux-reload-settings 2>/dev/null || true
+    fi
+
+    echo -e "\n${G}[✔] All done!${RS}"
+    press_enter
+    menu
+}
+
+# ── Nerd Font ─────────────────────────────────
+do_install_font() {
+    echo -e "\n${Y}[▶] Installing FiraCode Nerd Font...${RS}\n"
+    mkdir -p "$HOME/.termux"
+    if curl -fL "https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/FiraCode/Regular/FiraCodeNerdFont-Regular.ttf" \
+        -o "$HOME/.termux/font.ttf"; then
+        termux-reload-settings 2>/dev/null || true
+        echo -e "${G}[✔] Font installed. Restart Termux.${RS}"
     else
-        echo -e "\\033[1;31m  ✘ DENIED\\033[0m"
-        [ $_tl_attempt -eq 3 ] && exit 1
-        _tl_attempt=$((_tl_attempt+1)); sleep 0.5
+        echo -e "${R}[✘] Download failed. Check internet.${RS}"
+    fi
+    press_enter
+    appearance_menu
+}
+
+# ── Color Themes ──────────────────────────────
+apply_color_theme() {
+    local theme="$1"
+    mkdir -p "$HOME/.termux"
+    local file="$HOME/.termux/colors.properties"
+
+    case "$theme" in
+        hacker)
+cat > "$file" <<'EOF'
+background=#020c06
+foreground=#00ff41
+cursor=#00ff41
+color0=#020c06
+color1=#ff2244
+color2=#00ff41
+color3=#ffcc00
+color4=#00ccff
+color5=#cc00ff
+color6=#00ffcc
+color7=#b0ffb0
+color8=#1a3a22
+color9=#ff4466
+color10=#33ff66
+color11=#ffdd44
+color12=#33ddff
+color13=#dd33ff
+color14=#33ffdd
+color15=#e0ffe0
+EOF
+            ;;
+        kali)
+cat > "$file" <<'EOF'
+background=#1a1a2e
+foreground=#e0e0e0
+cursor=#00d4ff
+color0=#1a1a2e
+color1=#ff4444
+color2=#44ff88
+color3=#ffcc00
+color4=#4488ff
+color5=#cc44ff
+color6=#44ffcc
+color7=#e0e0e0
+color8=#2a2a4e
+color9=#ff6666
+color10=#66ffaa
+color11=#ffdd44
+color12=#66aaff
+color13=#dd66ff
+color14=#66ffdd
+color15=#ffffff
+EOF
+            ;;
+        dracula)
+cat > "$file" <<'EOF'
+background=#282a36
+foreground=#f8f8f2
+cursor=#f8f8f2
+color0=#21222c
+color1=#ff5555
+color2=#50fa7b
+color3=#f1fa8c
+color4=#bd93f9
+color5=#ff79c6
+color6=#8be9fd
+color7=#f8f8f2
+color8=#6272a4
+color9=#ff6e6e
+color10=#69ff94
+color11=#ffffa5
+color12=#d6acff
+color13=#ff92df
+color14=#a4ffff
+color15=#ffffff
+EOF
+            ;;
+        matrix)
+cat > "$file" <<'EOF'
+background=#000000
+foreground=#00ff00
+cursor=#00ff00
+color0=#000000
+color1=#003300
+color2=#00ff00
+color3=#009900
+color4=#006600
+color5=#00cc00
+color6=#33ff33
+color7=#00ff00
+color8=#002200
+color9=#004400
+color10=#00dd00
+color11=#00bb00
+color12=#008800
+color13=#00ee00
+color14=#44ff44
+color15=#66ff66
+EOF
+            ;;
+        catppuccin)
+cat > "$file" <<'EOF'
+background=#1e1e2e
+foreground=#cdd6f4
+cursor=#f5e0dc
+color0=#45475a
+color1=#f38ba8
+color2=#a6e3a1
+color3=#f9e2af
+color4=#89b4fa
+color5=#f5c2e7
+color6=#94e2d5
+color7=#bac2de
+color8=#585b70
+color9=#f38ba8
+color10=#a6e3a1
+color11=#f9e2af
+color12=#89b4fa
+color13=#f5c2e7
+color14=#94e2d5
+color15=#a6adc8
+EOF
+            ;;
+    esac
+
+    termux-reload-settings 2>/dev/null || true
+    echo -e "${G}[✔] Theme applied: ${theme}${RS}"
+}
+
+# ── Security Lock ─────────────────────────────
+do_add_lock() {
+    echo -e "\n${C}[▶] Setting up terminal lock...${RS}"
+    echo -ne "${Y}Create Access Key: ${RS}"
+    read -rs new_pass
+    echo
+
+    local lock_code
+    lock_code=$(cat <<LOCKEOF
+clear
+echo -e '\033[1;32m  Initializing...\033[0m'
+sleep 0.3
+clear
+_tc_attempt=1
+while [ \$_tc_attempt -le 3 ]; do
+    echo -e "\n\033[1;36m╔══════════════════════════════════════╗"
+    echo -e "║  \033[1;31m⬡ TER-CHAN — SECURE ACCESS \033[1;36m         ║"
+    echo -e "╚══════════════════════════════════════╝\033[0m"
+    echo -ne "\033[1;33m  [Attempt \$_tc_attempt/3] Access Key: \033[0m"
+    read -rs _tc_pass
+    echo
+    if [ "\$_tc_pass" = "${new_pass}" ]; then
+        echo -e "\033[1;32m  ✔ ACCESS GRANTED\033[0m"
+        sleep 0.5
+        clear
+        break
+    else
+        echo -e "\033[1;31m  ✘ DENIED\033[0m"
+        [ \$_tc_attempt -eq 3 ] && exit 1
+        _tc_attempt=\$((_tc_attempt+1))
+        sleep 0.5
     fi
 done
-"""
-    write_block(ZSHRC, 'LOCK', lock)
-    print(f'{LP}{G}[✔] Lock added to .zshrc{RS}')
-    press_enter(); security_menu()
+LOCKEOF
+)
+    write_block "LOCK" "$lock_code"
+    echo -e "${G}[✔] Lock added to .zshrc${RS}"
+    press_enter
+    security_menu
+}
 
-def do_remove_lock():
-    remove_block(ZSHRC, 'LOCK')
-    print(f'{LP}{G}[✔] Lock removed from .zshrc{RS}')
-    press_enter(); security_menu()
+do_remove_lock() {
+    remove_block "LOCK"
+    echo -e "${G}[✔] Lock removed from .zshrc${RS}"
+    press_enter
+    security_menu
+}
 
-def security_menu():
-    banner()
-    cline('╔','╗'); cmid('SECURITY',C); cline('╚','╝')
-    print()
-    print(f'{LP}  {C}[{W}01{C}]{B} Add Terminal Lock')
-    print(f'{LP}  {C}[{W}02{C}]{R} Remove Terminal Lock')
-    print(f'{LP}  {C}[{W}00{C}]{R} ← Back')
-    print()
-    a = input(f'{LP}{C}Selection ❯ {RS}').strip()
-    if   a in ('1','01'): do_add_lock()
-    elif a in ('2','02'): do_remove_lock()
-    elif a in ('0','00'): menu()
-    else: security_menu()
+# ══════════════════════════════════════════════
+#  MENUS
+# ══════════════════════════════════════════════
 
-# ══════════════════════════════════════════
-#  TOOL BANNER (screen এ দেখায়)
-# ══════════════════════════════════════════
-def banner():
-    os.system('clear')
-    print()
-    print(f'{C}{LP}  ████████╗███████╗██████╗      ██████╗██╗  ██╗ █████╗ ███╗   ██╗{RS}')
-    print(f'{C}{LP}     ██╔══╝██╔════╝██╔══██╗    ██╔════╝██║  ██║██╔══██╗████╗  ██║{RS}')
-    print(f'{G}{LP}     ██║   █████╗  ██████╔╝    ██║     ███████║███████║██╔██╗ ██║{RS}')
-    print(f'{G}{LP}     ██║   ██╔══╝  ██╔══██╗    ██║     ██╔══██║██╔══██║██║╚██╗██║{RS}')
-    print(f'{R}{LP}     ██║   ███████╗██║  ██║    ╚██████╗██║  ██║██║  ██║██║ ╚████║{RS}')
-    print(f'{R}{LP}     ╚═╝   ╚══════╝╚═╝  ╚═╝     ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝{RS}')
-    print()
-    cline('╔','╗')
-    cmid('Ter-Chan — Termux Customization v3.0', W)
-    cmid('Zsh Edition | Python Powered', DIM)
-    cline('╚','╝')
-    print()
-    print(f'{LP}  {R}[!]{W} User   : {C}{cfg.get("USERNAME","TyranRoot")}{RS}')
-    print(f'{LP}  {R}[!]{W} Host   : {C}{cfg.get("HOSTNAME","Termux")}{RS}')
-    print(f'{LP}  {R}[!]{W} Prompt : {C}{cfg.get("PROMPT_STYLE","kali")}{RS}')
-    print(f'{LP}  {R}[!]{W} Banner : {C}{cfg.get("BANNER_TYPE","figlet")} / {cfg.get("BANNER_TEXT","Ter-Chan")}{RS}')
-    print()
+menu() {
+    load_config
+    banner
 
-# ══════════════════════════════════════════
-#  MAIN MENU
-# ══════════════════════════════════════════
-def menu():
-    banner()
-    cline('╔','╗'); cmid('MAIN MENU',C); cline('╚','╝')
-    print()
-    print(f'{LP}  {C}[{W}01{C}]{G} 📦 Install All Dependencies')
-    print(f'{LP}  {C}[{W}02{C}]{C} 🎨 Startup Banner Settings')
-    print(f'{LP}  {C}[{W}03{C}]{Y} 💻 Zsh Prompt Style')
-    print(f'{LP}  {C}[{W}04{C}]{M} 🖌️  Appearance & Color Themes')
-    print(f'{LP}  {C}[{W}05{C}]{B} 🔒 Security Lock')
-    print(f'{LP}  {C}[{W}06{C}]{G} ✅ Apply All Changes Now')
-    print(f'{LP}  {C}[{W}00{C}]{R} ✖  Exit')
-    print()
-    a = input(f'{LP}{C}Selection ❯ {RS}').strip()
+    printf "${C}[${W}01${C}]${G} Necessary Setup\n"
+    printf "${C}[${W}02${C}]${G} Zsh Options\n"
+    printf "${C}[${W}03${C}]${Y} Appearance & Themes\n"
+    printf "${C}[${W}04${C}]${B} Security\n"
+    printf "${C}[${W}05${C}]${G} Apply Changes to .zshrc\n"
+    printf "${C}[${W}00${C}]${R} Exit\n\n"
 
-    if   a in ('1','01'): install_deps()
-    elif a in ('2','02'): banner_config_menu()
-    elif a in ('3','03'): prompt_menu()
-    elif a in ('4','04'): appearance_menu()
-    elif a in ('5','05'): security_menu()
-    elif a in ('6','06'):
-        apply_all(); press_enter(); menu()
-    elif a in ('0','00'):
-        print(f'\n{LP}{C}Goodbye, {cfg.get("USERNAME","TyranRoot")}. Stay hacking. 🔐{RS}')
-        print(f'{LP}{Y}Run: source ~/.zshrc  — to apply changes{RS}\n')
-        sys.exit(0)
-    else:
-        menu()
+    echo -ne "${C}Selection: ${RS}"
+    read -r a
+    case $a in
+        1|01) do_install_deps ;;
+        2|02) zsh_menu ;;
+        3|03) appearance_menu ;;
+        4|04) security_menu ;;
+        5|05)
+            load_config
+            apply_all
+            press_enter
+            menu
+            ;;
+        0|00)
+            echo -e "\n${C}Goodbye, ${USERNAME}. Stay hacking. 🔐${RS}"
+            echo -e "${Y}Run: source ~/.zshrc — to apply changes${RS}\n"
+            exit 0
+            ;;
+        *) menu ;;
+    esac
+}
 
-if __name__ == '__main__':
-    try:
-        menu()
-    except KeyboardInterrupt:
-        print(f'\n\n{LP}{C}Goodbye. Stay hacking. 🔐{RS}\n')
-        sys.exit(0)
+zsh_menu() {
+    load_config
+    banner
+
+    printf "${C}[${W}01${C}]${G} Startup Banner Settings\n"
+    printf "${C}[${W}02${C}]${G} Prompt Style\n"
+    printf "${C}[${W}03${C}]${Y} Change Username\n"
+    printf "${C}[${W}04${C}]${Y} Change Hostname\n"
+    printf "${C}[${W}00${C}]${R} Back\n\n"
+
+    echo -ne "${C}Selection: ${RS}"
+    read -r a
+    case $a in
+        1|01) banner_menu ;;
+        2|02) prompt_menu ;;
+        3|03)
+            echo -ne "\n${Y}New username (now: ${USERNAME}): ${RS}"
+            read -r new_user
+            [ -n "$new_user" ] && USERNAME="$new_user" && save_config
+            apply_all
+            press_enter
+            zsh_menu
+            ;;
+        4|04)
+            echo -ne "\n${Y}New hostname (now: ${HOSTNAME}): ${RS}"
+            read -r new_host
+            [ -n "$new_host" ] && HOSTNAME="$new_host" && save_config
+            apply_all
+            press_enter
+            zsh_menu
+            ;;
+        0|00) menu ;;
+        *) zsh_menu ;;
+    esac
+}
+
+banner_menu() {
+    load_config
+    banner
+
+    printf "${C}[${W}01${C}]${G} Type: Figlet + Lolcat"
+    [ "$BANNER_TYPE" = "figlet" ] && printf " ${R}◀ active"
+    printf "\n"
+    printf "${C}[${W}02${C}]${G} Type: Neofetch"
+    [ "$BANNER_TYPE" = "neofetch" ] && printf " ${R}◀ active"
+    printf "\n"
+    printf "${C}[${W}03${C}]${G} Type: Figlet + Neofetch"
+    [ "$BANNER_TYPE" = "both" ] && printf " ${R}◀ active"
+    printf "\n"
+    printf "${C}[${W}04${C}]${Y} Change Banner Text (now: ${BANNER_TEXT})\n"
+    printf "${C}[${W}05${C}]${Y} Color: Random/Lolcat"
+    [ "$BANNER_COLOR" = "random" ] && printf " ${R}◀"
+    printf "\n"
+    printf "${C}[${W}06${C}]${Y} Color: Cyan"
+    [ "$BANNER_COLOR" = "cyan" ] && printf " ${R}◀"
+    printf "\n"
+    printf "${C}[${W}07${C}]${Y} Color: Green"
+    [ "$BANNER_COLOR" = "green" ] && printf " ${R}◀"
+    printf "\n"
+    printf "${C}[${W}08${C}]${Y} Color: Red"
+    [ "$BANNER_COLOR" = "red" ] && printf " ${R}◀"
+    printf "\n"
+    printf "${C}[${W}09${C}]${R} Remove Startup Banner\n"
+    printf "${C}[${W}00${C}]${R} Back\n\n"
+
+    echo -ne "${C}Selection: ${RS}"
+    read -r a
+    case $a in
+        1|01) BANNER_TYPE="figlet";   save_config; apply_all; press_enter; banner_menu ;;
+        2|02) BANNER_TYPE="neofetch"; save_config; apply_all; press_enter; banner_menu ;;
+        3|03) BANNER_TYPE="both";     save_config; apply_all; press_enter; banner_menu ;;
+        4|04)
+            echo -ne "\n${Y}Banner text: ${RS}"
+            read -r new_text
+            [ -n "$new_text" ] && BANNER_TEXT="$new_text" && save_config
+            apply_all
+            press_enter
+            banner_menu
+            ;;
+        5|05) BANNER_COLOR="random";  save_config; apply_all; press_enter; banner_menu ;;
+        6|06) BANNER_COLOR="cyan";    save_config; apply_all; press_enter; banner_menu ;;
+        7|07) BANNER_COLOR="green";   save_config; apply_all; press_enter; banner_menu ;;
+        8|08) BANNER_COLOR="red";     save_config; apply_all; press_enter; banner_menu ;;
+        9|09)
+            remove_block "BANNER"
+            echo -e "${G}[✔] Startup banner removed${RS}"
+            press_enter
+            banner_menu
+            ;;
+        0|00) zsh_menu ;;
+        *) banner_menu ;;
+    esac
+}
+
+prompt_menu() {
+    load_config
+    banner
+
+    printf "${C}[${W}01${C}]${G} Kali Style"
+    [ "$PROMPT_STYLE" = "kali" ] && printf " ${R}◀ active"
+    printf "\n${DIM}   ┌──(${USERNAME}@${HOSTNAME})-[~]\n   └─\$${RS}\n\n"
+
+    printf "${C}[${W}02${C}]${G} Arrow Style"
+    [ "$PROMPT_STYLE" = "arrow" ] && printf " ${R}◀ active"
+    printf "\n${DIM}   ╔═[${USERNAME}@${HOSTNAME}]═[~]\n   ╚═▶${RS}\n\n"
+
+    printf "${C}[${W}03${C}]${G} Minimal Style"
+    [ "$PROMPT_STYLE" = "minimal" ] && printf " ${R}◀ active"
+    printf "\n${DIM}   ${USERNAME}@${HOSTNAME} ~ ❯${RS}\n\n"
+
+    printf "${C}[${W}04${C}]${G} Hacker Style"
+    [ "$PROMPT_STYLE" = "hacker" ] && printf " ${R}◀ active"
+    printf "\n${DIM}   [root@${HOSTNAME}]-[~]\n   #${RS}\n\n"
+
+    printf "${C}[${W}05${C}]${G} Powerline Style"
+    [ "$PROMPT_STYLE" = "powerline" ] && printf " ${R}◀ active"
+    printf "\n${DIM}   ${USERNAME}  ${HOSTNAME}  ~ ▶${RS}\n\n"
+
+    printf "${C}[${W}00${C}]${R} Back\n\n"
+
+    echo -ne "${C}Selection: ${RS}"
+    read -r a
+    case $a in
+        1|01) PROMPT_STYLE="kali";      save_config; apply_all; press_enter; prompt_menu ;;
+        2|02) PROMPT_STYLE="arrow";     save_config; apply_all; press_enter; prompt_menu ;;
+        3|03) PROMPT_STYLE="minimal";   save_config; apply_all; press_enter; prompt_menu ;;
+        4|04) PROMPT_STYLE="hacker";    save_config; apply_all; press_enter; prompt_menu ;;
+        5|05) PROMPT_STYLE="powerline"; save_config; apply_all; press_enter; prompt_menu ;;
+        0|00) zsh_menu ;;
+        *) prompt_menu ;;
+    esac
+}
+
+appearance_menu() {
+    load_config
+    banner
+
+    printf "${C}[${W}01${C}]${G} Install FiraCode Nerd Font\n"
+    printf "${C}[${W}02${C}]${Y} Theme: Hacker Green\n"
+    printf "${C}[${W}03${C}]${B} Theme: Kali Dark\n"
+    printf "${C}[${W}04${C}]${M} Theme: Dracula\n"
+    printf "${C}[${W}05${C}]${G} Theme: Matrix Black\n"
+    printf "${C}[${W}06${C}]${M} Theme: Catppuccin\n"
+    printf "${C}[${W}00${C}]${R} Back\n\n"
+
+    echo -ne "${C}Selection: ${RS}"
+    read -r a
+    case $a in
+        1|01) do_install_font ;;
+        2|02) apply_color_theme "hacker";     press_enter; appearance_menu ;;
+        3|03) apply_color_theme "kali";       press_enter; appearance_menu ;;
+        4|04) apply_color_theme "dracula";    press_enter; appearance_menu ;;
+        5|05) apply_color_theme "matrix";     press_enter; appearance_menu ;;
+        6|06) apply_color_theme "catppuccin"; press_enter; appearance_menu ;;
+        0|00) menu ;;
+        *) appearance_menu ;;
+    esac
+}
+
+security_menu() {
+    load_config
+    banner
+
+    printf "${C}[${W}01${C}]${B} Add Terminal Lock\n"
+    printf "${C}[${W}02${C}]${R} Remove Terminal Lock\n"
+    printf "${C}[${W}00${C}]${R} Back\n\n"
+
+    echo -ne "${C}Selection: ${RS}"
+    read -r a
+    case $a in
+        1|01) do_add_lock    ;;
+        2|02) do_remove_lock ;;
+        0|00) menu ;;
+        *) security_menu ;;
+    esac
+}
+
+# ── Entry ─────────────────────────────────────
+load_config
+menu
